@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proctolearn - Project Documentation Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: fadeIn 0.6s ease-in;
+        }
+        
+        h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            opacity: 0.95;
+            font-weight: 300;
+        }
+        
+        .documentation-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .doc-card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            animation: slideUp 0.6s ease-out;
+        }
+        
+        .doc-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+        
+        .doc-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 22px;
+        }
+        
+        .doc-card p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+        
+        .doc-card a {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .doc-card a:hover {
+            background: #764ba2;
+        }
+        
+        .quick-stats {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .tech-stack {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .tech-stack h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .tech-category {
+            margin-bottom: 20px;
+        }
+        
+        .tech-category h4 {
+            color: #764ba2;
+            margin-bottom: 10px;
+        }
+        
+        .tech-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .tech-item {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .getting-started {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .getting-started h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .step {
+            background: #f9f9f9;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+        
+        .step h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .step code {
+            background: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin-top: 10px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 40px;
+            opacity: 0.9;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎓 Proctolearn</h1>
+            <p class="subtitle">Professional Quiz Proctoring Platform with Real-time Monitoring</p>
+        </header>
+        
+        <div class="quick-stats">
+            <div class="stat">
+                <div class="stat-number">6</div>
+                <div class="stat-label">Database Models</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">8+</div>
+                <div class="stat-label">API Routes</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">9</div>
+                <div class="stat-label">Activity Types</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">4</div>
+                <div class="stat-label">User Roles</div>
+            </div>
+        </div>
+        
+        <div class="tech-stack">
+            <h2>🏗️ Technology Stack</h2>
+            
+            <div class="tech-category">
+                <h4>Frontend</h4>
+                <div class="tech-list">
+                    <div class="tech-item">React 18.2</div>
+                    <div class="tech-item">Vite</div>
+                    <div class="tech-item">Material-UI</div>
+                    <div class="tech-item">Tailwind CSS</div>
+                    <div class="tech-item">Socket.io</div>
+                    <div class="tech-item">Zustand</div>
+                </div>
+            </div>
+            
+            <div class="tech-category">
+                <h4>Backend</h4>
+                <div class="tech-list">
+                    <div class="tech-item">Node.js</div>
+                    <div class="tech-item">Express.js</div>
+                    <div class="tech-item">Socket.io</div>
+                    <div class="tech-item">MongoDB</div>
+                    <div class="tech-item">Mongoose</div>
+                    <div class="tech-item">JWT</div>
+                </div>
+            </div>
+            
+            <div class="tech-category">
+                <h4>DevOps</h4>
+                <div class="tech-list">
+                    <div class="tech-item">Docker</div>
+                    <div class="tech-item">Docker Compose</div>
+                    <div class="tech-item">Git</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="documentation-grid">
+            <div class="doc-card">
+                <h3>📖 README</h3>
+                <p>Complete project overview, features, architecture, and API documentation.</p>
+                <a href="README.md">Read More →</a>
+                <div class="badge">Start Here</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>⚙️ Installation Guide</h3>
+                <p>Step-by-step setup instructions for development and production deployment.</p>
+                <a href="INSTALLATION.md">Read More →</a>
+                <div class="badge">Essential</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>📋 Project Summary</h3>
+                <p>Comprehensive overview of what's been created and how to use it.</p>
+                <a href="PROJECT_SUMMARY.md">Read More →</a>
+                <div class="badge">Complete Reference</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>⚡ Quick Reference</h3>
+                <p>Common commands, APIs, troubleshooting, and quick tips.</p>
+                <a href="QUICK_REFERENCE.md">Read More →</a>
+                <div class="badge">Cheat Sheet</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>🗺️ Roadmap</h3>
+                <p>Development phases, timeline, and feature implementation plan.</p>
+                <a href="ROADMAP.md">Read More →</a>
+                <div class="badge">Planning</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>👨‍💻 Development Guide</h3>
+                <p>Code standards, best practices, testing strategy, and guidelines.</p>
+                <a href="DEVELOPMENT.md">Read More →</a>
+                <div class="badge">Standards</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>🔧 Backend Docs</h3>
+                <p>Backend-specific documentation and setup instructions.</p>
+                <a href="backend/README.md">Read More →</a>
+                <div class="badge">Backend</div>
+            </div>
+            
+            <div class="doc-card">
+                <h3>🎨 Frontend Docs</h3>
+                <p>Frontend-specific documentation and setup instructions.</p>
+                <a href="frontend/README.md">Read More →</a>
+                <div class="badge">Frontend</div>
+            </div>
+        </div>
+        
+        <div class="getting-started">
+            <h2>🚀 Quick Start</h2>
+            
+            <div class="steps">
+                <div class="step">
+                    <h4>1. Setup Backend</h4>
+                    <code>cd backend && npm install && npm run dev</code>
+                    <p style="margin-top: 10px; color: #666;">Runs on http://localhost:5000</p>
+                </div>
+                
+                <div class="step">
+                    <h4>2. Setup Frontend</h4>
+                    <code>cd frontend && npm install && npm run dev</code>
+                    <p style="margin-top: 10px; color: #666;">Runs on http://localhost:3000</p>
+                </div>
+                
+                <div class="step">
+                    <h4>3. Configure .env</h4>
+                    <code>cp .env.example .env</code>
+                    <p style="margin-top: 10px; color: #666;">Add your configuration details</p>
+                </div>
+                
+                <div class="step">
+                    <h4>4. Start MongoDB</h4>
+                    <code>net start MongoDB</code>
+                    <p style="margin-top: 10px; color: #666;">Windows command (see docs for other OS)</p>
+                </div>
+                
+                <div class="step">
+                    <h4>5. Access App</h4>
+                    <code>http://localhost:3000</code>
+                    <p style="margin-top: 10px; color: #666;">Open in your browser</p>
+                </div>
+                
+                <div class="step">
+                    <h4>6. Login</h4>
+                    <code>Create account or use test credentials</code>
+                    <p style="margin-top: 10px; color: #666;">See INSTALLATION.md for test credentials</p>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>🎓 Proctolearn - Making Education Secure & Integrity-Driven</p>
+            <p style="font-size: 12px; margin-top: 10px;">Version 1.0 | Created December 30, 2025 | MIT License</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,919 @@
+import React, { useEffect, useState, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Eye, Users, BarChart3, Lock, CheckCircle, Clock, Shield, Award, Video, FileText, Zap, ArrowUp, Menu, X, LogIn, HelpCircle } from 'lucide-react';
+import { useAuthStore } from '../context/store';
+import { useEscapeKey, useFocusTrap } from '../hooks/useKeyboardNavigation';
+
+const Landing = () => {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const [isVisible, setIsVisible] = useState({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [fabExpanded, setFabExpanded] = useState(false);
+  const mobileMenuRef = useRef(null);
+  
+  // Close mobile menu with Escape key
+  useEscapeKey(mobileMenuOpen, () => setMobileMenuOpen(false));
+  
+  // Trap focus in mobile menu when open
+  useFocusTrap(mobileMenuOpen, mobileMenuRef);
+
+  useEffect(() => {
+    if (user) {
+      const role = user.role?.toLowerCase();
+      if (role === 'admin') navigate('/admin/dashboard');
+      else if (role === 'faculty') navigate('/faculty/dashboard');
+      else navigate('/student/dashboard');
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible((prev) => ({ ...prev, [entry.target.id]: true }));
+          }
+        });
+      },
+      { threshold: 0.1 }
+    );
+
+    document.querySelectorAll('[data-animate]').forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToSection = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  return (
+    <div className="bg-gradient-to-br from-emerald-50 via-white to-lime-50 min-h-screen">
+      <style>{`
+        /* Hide scrollbar for Chrome, Safari and Opera */
+        ::-webkit-scrollbar {
+          display: none;
+        }
+        
+        /* Hide scrollbar for IE, Edge and Firefox */
+        body {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+        
+        .nav-link {
+          position: relative;
+          transition: color 0.3s ease;
+        }
+        .nav-link::after {
+          content: '';
+          position: absolute;
+          bottom: -4px;
+          left: 50%;
+          width: 0;
+          height: 2px;
+          background: linear-gradient(90deg, #10B981, #84CC16);
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          transform: translateX(-50%);
+        }
+        .nav-link:hover::after {
+          width: 100%;
+        }
+      `}</style>
+
+      {/* Navbar - GRAMS Style */}
+      <nav className="bg-white/95 backdrop-blur-xl border-b border-emerald-200/60 shadow-lg sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            {/* Logo - Left */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 hover:scale-110 transition-all duration-300 cursor-pointer">
+                <span className="text-white font-bold text-xl">PL</span>
+              </div>
+              <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight cursor-pointer">
+                Proctolearn
+              </span>
+            </div>
+
+            {/* Desktop Nav Links - Center */}
+            <div className="hidden lg:flex items-center gap-8 mx-20">
+              <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold py-2">
+                Home
+              </button>
+              <button onClick={() => scrollToSection('features')} className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold py-2">
+                Features
+              </button>
+              <button onClick={() => scrollToSection('how-it-works')} className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold py-2">
+                How it Works
+              </button>
+              <button onClick={() => scrollToSection('why-different')} className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold py-2">
+                Why Different
+              </button>
+              <Link to="/support" className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold py-2">
+                Contact
+              </Link>
+            </div>
+
+            {/* Right Side - Search + Auth */}
+            <div className="flex items-center gap-4">
+              {/* Search Bar - Desktop Only */}
+              <div className="relative hidden md:block group">
+                <input
+                  type="text"
+                  placeholder="Search quizzes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-64 pl-12 pr-4 py-3 bg-white/70 backdrop-blur-sm border border-emerald-200/50 rounded-2xl focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:outline-none transition-all duration-300 shadow-lg placeholder-slate-500 text-sm"
+                />
+                <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 group-focus-within:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              {/* Auth Buttons - Desktop */}
+              <div className="hidden lg:flex items-center gap-3">
+                <Link
+                  to="/login"
+                  className="nav-link text-emerald-600 hover:text-emerald-700 font-semibold px-4 py-2 rounded-xl hover:bg-emerald-50/50 transition-all duration-300"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-semibold px-8 py-3 rounded-2xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 hover:from-emerald-600 hover:to-lime-600 transition-all duration-400 transform-gpu"
+                >
+                  New Account
+                </Link>
+              </div>
+
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileMenuOpen}
+                aria-controls="mobile-menu"
+                className="lg:hidden p-2 rounded-xl hover:bg-emerald-100 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {mobileMenuOpen ? (
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                ) : (
+                  <svg className="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu */}
+          <div
+            id="mobile-menu"
+            ref={mobileMenuRef}
+            role="navigation"
+            aria-label="Mobile navigation"
+            className={`lg:hidden bg-white/90 backdrop-blur-md px-4 pb-8 border-t border-emerald-200/50 overflow-hidden transition-all duration-400 ease-out ${
+              mobileMenuOpen ? 'max-h-[600px] opacity-100' : 'max-h-0 opacity-0'
+            }`}
+          >
+            {/* Mobile Search */}
+            <div className="relative mt-4 mb-4">
+              <input
+                type="text"
+                placeholder="Search quizzes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-white/70 backdrop-blur-sm border border-emerald-200/50 rounded-2xl focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:outline-none transition-all duration-300 shadow-lg placeholder-slate-500 text-sm"
+              />
+              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+
+            {/* Mobile Nav Links */}
+            <div className="flex flex-col gap-4 pt-4">
+              <button
+                onClick={() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-3 px-4 rounded-xl hover:bg-emerald-50 text-emerald-600 font-semibold transition-all duration-300"
+              >
+                Home
+              </button>
+              <button
+                onClick={() => {
+                  scrollToSection('features');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-3 px-4 rounded-xl hover:bg-emerald-50 text-emerald-600 font-semibold transition-all duration-300"
+              >
+                Features
+              </button>
+              <button
+                onClick={() => {
+                  scrollToSection('how-it-works');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-3 px-4 rounded-xl hover:bg-emerald-50 text-emerald-600 font-semibold transition-all duration-300"
+              >
+                How it Works
+              </button>
+              <button
+                onClick={() => {
+                  scrollToSection('why-different');
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left py-3 px-4 rounded-xl hover:bg-emerald-50 text-emerald-600 font-semibold transition-all duration-300"
+              >
+                Why Different
+              </button>
+              <Link
+                to="/support"
+                className="py-3 px-4 rounded-xl hover:bg-emerald-50 text-emerald-600 font-semibold transition-all duration-300"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Contact
+              </Link>
+            </div>
+
+            {/* Mobile Auth Buttons */}
+            <div className="flex flex-col gap-3 pt-6 border-t border-emerald-200/30 mt-4">
+              <Link
+                to="/login"
+                className="text-center py-3 px-6 border-2 border-emerald-500 text-emerald-700 font-semibold rounded-xl hover:bg-emerald-50 transition-all duration-300"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-semibold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-400 text-center"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                New Account
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <main>
+      <section className="relative bg-gradient-to-br from-emerald-500 via-emerald-400 to-lime-400 min-h-[85vh] flex items-center overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left Content */}
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8 }}
+              className="text-white"
+            >
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold mb-8 border border-white/30">
+                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                OFFICIAL PORTAL
+              </div>
+              
+              <h1 className="text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+                Smarter<br />
+                Assessment,<br />
+                <span className="text-white/90">Faster Results.</span>
+              </h1>
+              
+              <p className="text-xl text-white/90 mb-8 leading-relaxed max-w-lg">
+                A unified platform for Students, Faculty, and Administrators to create, take, and monitor secure proctored quizzes efficiently.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row gap-4 mb-12">
+                <Link to="/register" className="bg-white text-emerald-600 font-bold px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 text-center hover:scale-105">
+                  Get Started
+                </Link>
+                <button onClick={() => scrollToSection('features')} className="bg-emerald-600/30 backdrop-blur-md border-2 border-white text-white font-bold px-8 py-4 rounded-2xl hover:bg-white hover:text-emerald-600 transition-all duration-300">
+                  View Features
+                </button>
+              </div>
+
+              {/* Stats */}
+              <div className="grid grid-cols-3 gap-6">
+                <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer">
+                  <div className="text-3xl font-bold mb-1">500+</div>
+                  <div className="text-sm text-emerald-50">Active Users</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer">
+                  <div className="text-3xl font-bold mb-1">98%</div>
+                  <div className="text-sm text-emerald-50">Accuracy</div>
+                </div>
+                <div className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer">
+                  <div className="text-3xl font-bold mb-1">24/7</div>
+                  <div className="text-sm text-emerald-50">Support</div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Right Image - GRAMS Style with White Border */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="relative group"
+            >
+              <div className="relative bg-white rounded-3xl p-3 shadow-2xl overflow-hidden">
+                <div className="overflow-hidden rounded-2xl">
+                  <img 
+                    src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop"
+                    alt="Students Learning"
+                    className="rounded-2xl w-full h-auto transform group-hover:scale-110 transition-transform duration-700 ease-out cursor-pointer"
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      <section className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <span className="inline-block px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold mb-4">
+              ABOUT SYSTEM
+            </span>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">
+              Centralized Proctored Assessment Platform
+            </h2>
+            <p className="text-lg text-slate-600 max-w-3xl mx-auto">
+              Proctolearn is a transparent, accountable platform that connects students with educators to conduct secure AI-proctored quizzes efficiently.
+            </p>
+          </div>
+          
+          {/* Add Image Section */}
+          <div className="max-w-5xl mx-auto mt-16">
+            <div className="relative group overflow-hidden rounded-3xl shadow-2xl border-8 border-white">
+              <img 
+                src="https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1200&h=700&fit=crop"
+                alt="Team Collaboration"
+                className="w-full h-auto transform group-hover:scale-110 transition-transform duration-700 ease-out cursor-pointer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Cards Section */}
+      <section id="features" className="py-20 bg-gradient-to-b from-white to-emerald-50/50" data-animate>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Feature 1 - AI Proctoring */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={isVisible.features ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6 }}
+              className="group"
+            >
+              <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 cursor-pointer h-full overflow-hidden">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <Eye className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">AI Proctoring</h3>
+                <p className="text-emerald-50 leading-relaxed">
+                  Advanced AI monitors student activity with 98% accuracy. Real-time alerts for suspicious behavior, gaze tracking, and audio monitoring.
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Feature 2 - Quiz Management */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={isVisible.features ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="group"
+            >
+              <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 cursor-pointer h-full overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:-translate-x-full hover:before:translate-x-full before:transition-transform before:duration-1000">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">Create & Manage</h3>
+                <p className="text-blue-50 leading-relaxed">
+                  Faculty can create quizzes with ease. Add questions, set time limits, configure proctoring settings, and track student performance in real-time.
+                </p>
+              </div>
+            </motion.div>
+
+            {/* Feature 3 - Analytics */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={isVisible.features ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, delay: 0.4 }}
+              className="group"
+            >
+              <div className="relative bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 cursor-pointer h-full overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:-translate-x-full hover:before:translate-x-full before:transition-transform before:duration-1000">
+                <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <BarChart3 className="w-8 h-8" />
+                </div>
+                <h3 className="text-2xl font-bold mb-4">Detailed Analytics</h3>
+                <p className="text-orange-50 leading-relaxed">
+                  Comprehensive reports and public dashboards. Track performance metrics, flag reviews, and generate detailed analytics for stakeholders.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Quiz Lifecycle Section */}
+      <section className="py-20 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIgc3Ryb2tlLXdpZHRoPSIxIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-50"></div>
+        
+        <div className="max-w-6xl mx-auto px-4 relative z-10">
+          <div className="text-center mb-12">
+            <span className="inline-block px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold mb-4 border border-emerald-500/30">
+              PROCESS
+            </span>
+            <h2 className="text-4xl font-bold mb-4">Real-Time Assessment Lifecycle</h2>
+            <p className="text-slate-300 text-lg max-w-3xl mx-auto">
+              Every quiz must go through these stages. Automatic status updates create accountability.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-16">
+            {[
+              { num: 1, title: 'Create', desc: 'Faculty creates quiz with questions', icon: FileText, color: 'from-emerald-500 to-lime-500' },
+              { num: 2, title: 'Attempt', desc: 'Students take proctored quiz', icon: Video, color: 'from-blue-500 to-cyan-500' },
+              { num: 3, title: 'Review', desc: 'AI analyzes & flags violations', icon: Eye, color: 'from-orange-500 to-amber-500' },
+              { num: 4, title: 'Results', desc: 'Instant grades with reports', icon: Award, color: 'from-purple-500 to-pink-500' }
+            ].map((step, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: idx * 0.1 }}
+                viewport={{ once: true }}
+                className="bg-slate-800/50 backdrop-blur-md rounded-2xl p-6 border border-slate-700 hover:border-emerald-500/50 transition-all duration-300 hover:-translate-y-2"
+              >
+                <div className={`w-14 h-14 bg-gradient-to-br ${step.color} rounded-xl flex items-center justify-center text-white font-bold text-2xl mb-4 shadow-lg`}>
+                  {step.num}
+                </div>
+                <div className="flex items-center gap-3 mb-3">
+                  <step.icon className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-xl font-bold">{step.title}</h3>
+                </div>
+                <p className="text-slate-400 text-sm">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 relative overflow-hidden" data-animate>
+        {/* Animated background elements */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-purple-500 rounded-full filter blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-blue-500 rounded-full filter blur-3xl animate-pulse delay-1000"></div>
+        </div>
+
+        <div className="max-w-6xl mx-auto px-4 relative z-10">
+          <div className="text-center mb-16">
+            <span className="inline-block px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full text-sm font-bold mb-4 shadow-lg">
+              PROCESS
+            </span>
+            <h2 className="text-4xl font-bold text-white mb-4">
+              How Proctolearn Works
+            </h2>
+            <p className="text-slate-300 text-lg">Simple, secure, and seamless assessment process</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { num: 1, title: 'Create', desc: 'Faculty creates quiz with questions', icon: '📝', color: 'from-green-400 to-emerald-500', borderColor: 'border-green-400' },
+              { num: 2, title: 'Attempt', desc: 'Students take proctored quiz', icon: '🎥', color: 'from-blue-400 to-cyan-500', borderColor: 'border-blue-400' },
+              { num: 3, title: 'Review', desc: 'AI analyzes & flags violations', icon: '👁️', color: 'from-orange-400 to-red-500', borderColor: 'border-orange-400' },
+              { num: 4, title: 'Results', desc: 'Instant grades with reports', icon: '🏆', color: 'from-purple-400 to-pink-500', borderColor: 'border-purple-400' }
+            ].map((step, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 50 }}
+                animate={isVisible['how-it-works'] ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.6, delay: idx * 0.15 }}
+                className={`group relative bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-xl rounded-3xl p-6 shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-4 border-2 ${step.borderColor} cursor-pointer overflow-hidden`}
+              >
+                {/* Animated shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                
+                {/* Glow effect on hover */}
+                <div className={`absolute inset-0 bg-gradient-to-br ${step.color} opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-500`}></div>
+
+                {/* Number badge */}
+                <div className={`relative w-20 h-20 bg-gradient-to-br ${step.color} rounded-2xl flex items-center justify-center text-white font-bold text-3xl mb-4 shadow-2xl group-hover:scale-125 group-hover:rotate-12 transition-all duration-500 mx-auto`}>
+                  <span className="relative z-10">{step.num}</span>
+                  <div className={`absolute inset-0 bg-gradient-to-br ${step.color} rounded-2xl blur-lg opacity-50 group-hover:opacity-100 transition-opacity duration-500`}></div>
+                </div>
+
+                {/* Icon */}
+                <div className="text-4xl mb-3 text-center group-hover:scale-125 transition-transform duration-300">
+                  {step.icon}
+                </div>
+
+                {/* Title */}
+                <h3 className="text-2xl font-bold text-white mb-3 text-center group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-300 transition-all duration-300">
+                  {step.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-slate-300 leading-relaxed text-center text-sm group-hover:text-slate-100 transition-colors duration-300">
+                  {step.desc}
+                </p>
+
+                {/* Hover border glow */}
+                <div className={`absolute inset-0 rounded-3xl border-2 ${step.borderColor} opacity-0 group-hover:opacity-100 group-hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] transition-all duration-500`}></div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Why Different Section */}
+      <section id="why-different" className="py-20 bg-gradient-to-br from-white via-lime-50/30 to-emerald-50/50" data-animate>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="text-center mb-16">
+            <span className="inline-block px-4 py-2 bg-red-100 text-red-700 rounded-full text-sm font-bold mb-4">
+              BENEFITS
+            </span>
+            <h2 className="text-4xl font-bold text-slate-900 mb-4">
+              Why Proctolearn is Different
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left - Features List */}
+            <div className="space-y-6">
+              {[
+                { icon: Eye, title: 'AI-Powered Monitoring', desc: 'Real-time proctoring with 98% accuracy. Face detection, gaze tracking, and audio analysis.', color: 'emerald' },
+                { icon: Zap, title: 'Instant Results', desc: 'Automatic grading with instant feedback. No waiting time for objective assessments.', color: 'blue' },
+                { icon: Users, title: 'Multi-Role Support', desc: 'Designed for students, faculty, and admins with role-specific dashboards.', color: 'orange' },
+                { icon: Lock, title: 'Bank-Grade Security', desc: 'End-to-end encryption with secure data storage. ISO compliant and SSL certified.', color: 'purple' }
+              ].map((feature, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -30 }}
+                  animate={isVisible['why-different'] ? { opacity: 1, x: 0 } : {}}
+                  transition={{ duration: 0.6, delay: idx * 0.1 }}
+                  className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 border border-slate-100"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className={`w-14 h-14 bg-${feature.color}-100 rounded-xl flex items-center justify-center flex-shrink-0`}>
+                      <feature.icon className={`w-7 h-7 text-${feature.color}-600`} />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h3>
+                      <p className="text-slate-600 leading-relaxed">{feature.desc}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Right - Image with Stats */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={isVisible['why-different'] ? { opacity: 1, scale: 1 } : {}}
+              transition={{ duration: 0.8 }}
+              className="relative group"
+            >
+              <div className="relative rounded-3xl overflow-hidden shadow-2xl">
+                <img 
+                  src="https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=800&h=600&fit=crop"
+                  alt="Student Success"
+                  className="w-full h-auto transform group-hover:scale-110 transition-transform duration-700 ease-out cursor-pointer"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent group-hover:from-slate-900/70 transition-all duration-500"></div>
+                
+                {/* Stats Overlay */}
+                <div className="absolute bottom-8 left-8 right-8 grid grid-cols-2 gap-4">
+                  <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer">
+                    <div className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent mb-2">
+                      98%
+                    </div>
+                    <div className="text-sm text-slate-700 font-semibold">Detection Rate</div>
+                  </div>
+                  <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 shadow-xl hover:scale-105 hover:shadow-2xl transition-all duration-300 cursor-pointer">
+                    <div className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-cyan-500 bg-clip-text text-transparent mb-2">
+                      2.5s
+                    </div>
+                    <div className="text-sm text-slate-700 font-semibold">Avg Response</div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-24 bg-gradient-to-br from-emerald-600 via-emerald-500 to-lime-500 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
+        
+        <div className="max-w-5xl mx-auto px-4 text-center relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+              Ready to Revolutionize<br />Your Assessments?
+            </h2>
+            <p className="text-2xl text-emerald-50 mb-12 max-w-3xl mx-auto">
+              Join hundreds of educators and thousands of students using secure AI-powered proctoring today
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
+              <Link 
+                to="/register"
+                className="bg-white text-emerald-600 font-bold px-12 py-5 rounded-2xl text-xl shadow-2xl hover:shadow-3xl hover:scale-105 transition-all duration-500 inline-flex items-center gap-2"
+              >
+                Sign Up Now
+                <CheckCircle className="w-6 h-6" />
+              </Link>
+              <Link
+                to="/login"
+                className="border-3 border-white text-white font-bold px-12 py-5 rounded-2xl text-xl hover:bg-white hover:text-emerald-600 transition-all duration-300"
+              >
+                Track Existing Quiz
+              </Link>
+            </div>
+
+            <p className="text-emerald-100 text-lg">
+              <CheckCircle className="inline w-5 h-5 mr-2" />
+              Free to start • No credit card required • Cancel anytime
+            </p>
+          </motion.div>
+        </div>
+      </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-slate-300">
+        <div className="max-w-7xl mx-auto px-4 py-16">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
+            {/* Brand Section */}
+            <div className="lg:col-span-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                  PL
+                </div>
+                <span className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-lime-400 bg-clip-text text-transparent">
+                  Proctolearn
+                </span>
+              </div>
+              <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+                AI-Powered Proctored Assessment Platform - Making online education secure, transparent and accountable.
+              </p>
+              <div className="flex gap-3">
+                {['facebook-f', 'twitter', 'instagram', 'linkedin-in'].map((social) => (
+                  <a key={social} href="#" className="w-10 h-10 rounded-lg bg-slate-800 hover:bg-emerald-600 flex items-center justify-center transition-all duration-300 hover:scale-110">
+                    <i className={`fab fa-${social} text-sm`}></i>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            {/* Quick Links */}
+            <div>
+              <h3 className="text-white font-bold text-lg mb-4">QUICK LINKS</h3>
+              <ul className="space-y-3">
+                {[
+                  { to: '/', label: 'Home' },
+                  { to: '/available-quizzes', label: 'Available Quizzes' },
+                  { to: '/create-quiz', label: 'Create Quiz' },
+                  { onClick: () => scrollToSection('features'), label: 'Features' }
+                ].map((link, idx) => (
+                  <li key={idx}>
+                    {link.to ? (
+                      <Link to={link.to} className="text-slate-400 hover:text-emerald-400 transition-colors duration-200 text-sm">
+                        {link.label}
+                      </Link>
+                    ) : (
+                      <button onClick={link.onClick} className="text-slate-400 hover:text-emerald-400 transition-colors duration-200 text-sm">
+                        {link.label}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h3 className="text-white font-bold text-lg mb-4">RESOURCES</h3>
+              <ul className="space-y-3">
+                {['Documentation', 'FAQ', 'Blog'].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors duration-200 text-sm">{item}</a>
+                  </li>
+                ))}
+                <li>
+                  <Link to="/support" className="text-slate-400 hover:text-emerald-400 transition-colors duration-200 text-sm">Contact</Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Legal */}
+            <div>
+              <h3 className="text-white font-bold text-lg mb-4">LEGAL</h3>
+              <ul className="space-y-3">
+                {['Privacy Policy', 'Terms of Use', 'Cookie Policy', 'Accessibility'].map((item) => (
+                  <li key={item}>
+                    <a href="#" className="text-slate-400 hover:text-emerald-400 transition-colors duration-200 text-sm">{item}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Get In Touch */}
+            <div>
+              <h3 className="text-white font-bold text-lg mb-4">GET IN TOUCH</h3>
+              <ul className="space-y-4">
+                {[
+                  { icon: 'envelope', color: 'emerald', label: 'Email', value: 'support@proctolearn.com', href: 'mailto:support@proctolearn.com' },
+                  { icon: 'phone', color: 'lime', label: 'Phone', value: '+91-9909246267', href: 'tel:+919909246267' },
+                  { icon: 'map-marker-alt', color: 'emerald', label: 'Address', value: 'Ahmedabad, Gujarat' }
+                ].map((contact, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <div className={`text-${contact.color}-400 mt-1`}>
+                      <i className={`fas fa-${contact.icon}`}></i>
+                    </div>
+                    <div>
+                      <p className="text-white text-sm font-semibold">{contact.label}</p>
+                      {contact.href ? (
+                        <a href={contact.href} className="text-slate-400 text-sm hover:text-emerald-400 transition-colors">
+                          {contact.value}
+                        </a>
+                      ) : (
+                        <p className="text-slate-400 text-sm">{contact.value}</p>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Stay Updated Section */}
+          <div className="border-t border-slate-800 pt-12 pb-8">
+            <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700/50">
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                <div className="flex-1">
+                  <h3 className="text-white font-bold text-2xl mb-2">Stay Updated</h3>
+                  <p className="text-slate-400 text-sm">
+                    Subscribe to get updates on new features, quizzes, and educational content.
+                  </p>
+                </div>
+                <div className="flex-1 w-full md:max-w-md">
+                  <div className="flex gap-3">
+                    <input
+                      type="email"
+                      placeholder="Enter your email"
+                      className="flex-1 px-6 py-3 bg-slate-700/50 border border-slate-600 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    />
+                    <button className="bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold px-8 py-3 rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 transition-all duration-300 hover:scale-105">
+                      Subscribe
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Bar */}
+          <div className="border-t border-slate-800 pt-8">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <p className="text-slate-500 text-sm">
+                © 2026 Proctolearn. All rights reserved.
+              </p>
+              <div className="flex items-center gap-6 text-xs text-slate-500">
+                {[
+                  { icon: 'shield-alt', label: 'SSL Certified', color: 'emerald' },
+                  { icon: 'lock', label: 'Bank-grade Security', color: 'emerald' },
+                  { icon: 'check-circle', label: 'ISO Compliant', color: 'lime' }
+                ].map((badge, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <i className={`fas fa-${badge.icon} text-${badge.color}-400`}></i>
+                    <span>{badge.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </footer>
+
+      {/* Floating Action Button */}
+      <div className="fixed bottom-8 left-8 z-50">
+        {/* Action Items */}
+        <motion.div
+          className="flex flex-col gap-3 mb-3"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: fabExpanded ? 1 : 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ pointerEvents: fabExpanded ? 'auto' : 'none' }}
+        >
+          {/* Help Action */}
+          <motion.button
+            onClick={() => navigate('/support')}
+            initial={{ scale: 0, y: 20 }}
+            animate={{
+              scale: fabExpanded ? 1 : 0,
+              y: fabExpanded ? 0 : 20
+            }}
+            transition={{ duration: 0.3, delay: 0.1 }}
+            className="bg-white text-emerald-600 p-3 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-emerald-300 group relative"
+            aria-label="Get help"
+          >
+            <HelpCircle size={20} />
+            <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-sm px-3 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              Help & Support
+            </span>
+          </motion.button>
+
+          {/* Login Action */}
+          {!user && (
+            <motion.button
+              onClick={() => navigate('/login')}
+              initial={{ scale: 0, y: 20 }}
+              animate={{
+                scale: fabExpanded ? 1 : 0,
+                y: fabExpanded ? 0 : 20
+              }}
+              transition={{ duration: 0.3, delay: 0.05 }}
+              className="bg-white text-emerald-600 p-3 rounded-full shadow-lg hover:shadow-xl hover:scale-110 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-emerald-300 group relative"
+              aria-label="Login"
+            >
+              <LogIn size={20} />
+              <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-sm px-3 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                Login
+              </span>
+            </motion.button>
+          )}
+        </motion.div>
+
+        {/* Main FAB Button */}
+        <motion.button
+          onClick={() => setFabExpanded(!fabExpanded)}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          className="bg-gradient-to-br from-emerald-500 to-lime-500 text-white p-4 rounded-full shadow-2xl hover:shadow-emerald-500/50 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+          aria-label={fabExpanded ? 'Close quick actions' : 'Open quick actions'}
+          aria-expanded={fabExpanded}
+        >
+          <motion.div
+            animate={{ rotate: fabExpanded ? 135 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            {fabExpanded ? <X size={24} /> : <Menu size={24} />}
+          </motion.div>
+        </motion.button>
+      </div>
+
+      {/* Scroll to Top Button */
+      <motion.button
+        onClick={scrollToTop}
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ 
+          opacity: showScrollTop ? 1 : 0,
+          scale: showScrollTop ? 1 : 0.8,
+          y: showScrollTop ? 0 : 20
+        }}
+        transition={{ duration: 0.3 }}
+        className="fixed bottom-8 right-8 z-50 bg-gradient-to-br from-emerald-500 to-lime-500 text-white p-4 rounded-full shadow-2xl hover:shadow-emerald-500/50 hover:scale-110 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-emerald-300"
+        style={{ pointerEvents: showScrollTop ? 'auto' : 'none' }}
+        aria-label="Scroll to top"
+      >
+        <ArrowUp size={24} className="animate-bounce" />
+      </motion.button>
+    </div>
+  );
+};
+
+export default Landing;

@@ -1,0 +1,42 @@
+/* Navbar Styles extracted from Landing.jsx */
+
+.nav-link {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #10B981, #84CC16);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateX(-50%);
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+@keyframes button-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.8), 0 0 60px rgba(132, 204, 22, 0.6); }
+}
+
+.hover\:scale-110:hover {
+  animation: button-glow 2s ease-in-out infinite;
+}
+
+/* Animations that might be used in Navbar or Landing */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.8); }
+}

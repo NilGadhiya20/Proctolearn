@@ -1,0 +1,37 @@
+{
+  "name": "proctolearn",
+  "version": "1.0.0",
+  "description": "Proctolearn - Secure Quiz Platform",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build",
+    "start": "node backend/src/server.js",
+    "test": "npm run backend:test",
+    "backend:test": "cd backend && npm test",
+    "setup-institution": "cd backend && node setup-ppsu-institution.js",
+    "setup-admin": "cd backend && node setup-admin.js",
+    "setup": "npm run setup-institution && npm run setup-admin"
+  },
+  "keywords": [
+    "quiz",
+    "proctoring",
+    "education"
+  ],
+  "author": "Proctolearn Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.89.0",
+    "dotenv": "^17.2.3",
+    "mongoose": "^9.1.1",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  }
+}

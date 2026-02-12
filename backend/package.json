@@ -1,0 +1,49 @@
+{
+  "name": "proctolearn-backend",
+  "version": "1.0.0",
+  "description": "Proctolearn - Professional Quiz Proctoring Platform with Real-time Monitoring",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --coverage",
+    "lint": "eslint src/",
+    "seed": "node src/scripts/seed.js"
+  },
+  "keywords": [
+    "quiz",
+    "proctoring",
+    "monitoring",
+    "real-time",
+    "education"
+  ],
+  "author": "Proctolearn",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongoose": "^7.5.0",
+    "jsonwebtoken": "^9.0.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "express-validator": "^7.0.0",
+    "nodemailer": "^6.9.6",
+    "axios": "^1.5.0",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.0.0",
+    "uuid": "^9.0.0",
+    "google-auth-library": "^9.14.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.7.0",
+    "eslint": "^8.50.0",
+    "supertest": "^6.3.3",
+    "@types/node": "^20.0.0"
+  }
+}
