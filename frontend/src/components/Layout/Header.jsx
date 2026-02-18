@@ -27,9 +27,8 @@ import {
   CheckCircle,
   BookOpen,
   Plus,
-  Moon,
-  Sun,
-  MessageSquare
+  MessageSquare,
+  GraduationCap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NotificationsDropdown from '../Common/NotificationsDropdown';
@@ -39,7 +38,6 @@ const Header = ({ onMenuToggle }) => {
   const location = useLocation();
   const { user, logout } = useAuthStore();
   const [anchorEl, setAnchorEl] = useState(null);
-  const [darkMode, setDarkMode] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
   const isFirstLoad = useRef(true);
@@ -203,8 +201,9 @@ const Header = ({ onMenuToggle }) => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              background: 'linear-gradient(135deg, #16a34a 0%, #22c55e 100%)',
             }}>
-              <img src="/logo.svg" alt="Proctolearn logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <GraduationCap style={{ width: '24px', height: '24px', color: 'white' }} />
             </Box>
             <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
               <Typography variant="h6" sx={{ 
@@ -311,53 +310,6 @@ const Header = ({ onMenuToggle }) => {
           >
             ☰
           </IconButton>
-
-          {/* Dark Mode Toggle */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-            style={{ display: 'flex', alignItems: 'center' }}
-          >
-            <IconButton
-              onClick={() => setDarkMode(!darkMode)}
-              sx={{
-                color: darkMode ? '#fbbf24' : '#64748b',
-                padding: { xs: '8px' },
-                minWidth: { xs: '36px' },
-                minHeight: { xs: '36px' },
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  background: 'rgba(22, 163, 74, 0.1)',
-                  transform: 'rotate(180deg)',
-                }
-              }}
-            >
-              <AnimatePresence mode="wait">
-                {darkMode ? (
-                  <motion.div
-                    key="sun"
-                    initial={{ rotate: -180, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: 180, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Sun size={20} />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="moon"
-                    initial={{ rotate: 180, opacity: 0 }}
-                    animate={{ rotate: 0, opacity: 1 }}
-                    exit={{ rotate: -180, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Moon size={20} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </IconButton>
-          </motion.div>
 
           {/* Notifications Dropdown */}
           {user && (

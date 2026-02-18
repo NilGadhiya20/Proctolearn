@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, refreshAccessToken, getCurrentUser, logoutUser, googleAuthLogin, verifyEmailExists } from '../controllers/authController.js';
+import { registerUser, loginUser, refreshAccessToken, getCurrentUser, logoutUser, googleAuthLogin, verifyEmailExists, requestFacultyRole, getFacultyRequests, reviewFacultyRequest } from '../controllers/authController.js';
 import { validateUserRegistration, validateUserLogin } from '../middleware/validation.js';
 import { auth, checkRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errorHandler.js';
@@ -74,5 +74,10 @@ router.get('/me/submissions',
     });
   })
 );
+
+// Faculty Request Routes
+router.post('/request-faculty', auth, requestFacultyRole);
+router.get('/faculty-requests', auth, checkRole(USER_ROLES.ADMIN), getFacultyRequests);
+router.patch('/faculty-requests/:userId', auth, checkRole(USER_ROLES.ADMIN), reviewFacultyRequest);
 
 export default router;

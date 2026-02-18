@@ -372,3 +372,130 @@ export const logoutUser = asyncHandler(async (req, res) => {
     message: 'Logged out successfully'
   });
 });
+
+// Request Faculty Role
+export const requestFacultyRole = asyncHandler(async (req, res) => {
+  const { reason, qualifications } = req.body;
+
+  if (!reason || !qualifications) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Reason and qualifications are required'
+    });
+  }
+
+  const user = await User.findById(req.userId);
+  
+  if (!user) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  // Check if user is already faculty or admin
+  if (user.role === USER_ROLES.FACULTY || user.role === USER_ROLES.ADMIN) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'You already have faculty or admin privileges'
+    });
+  }
+
+  // Check if there's already a pending request
+  if (user.facultyRequest && user.facultyRequest.status === 'pending') {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'You already have a pending faculty request'
+    });
+  }
+
+  // Create faculty request
+  user.facultyRequest = {
+    status: 'pending',
+    requestedAt: new Date(),
+    reason,
+    qualifications
+  };
+
+  await user.save();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Faculty role request submitted successfully',
+    data: user.facultyRequest
+  });
+});
+
+// Get All Faculty Requests (Admin only)
+export const getFacultyRequests = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+  const query = { 'facultyRequest.status': status || 'pending' };
+
+  const users = await User.find(query)
+    .select('firstName lastName email role facultyRequest createdAt')
+    .populate('institution', 'name code')
+    .sort({ 'facultyRequest.requestedAt': -1 });
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: users,
+    count: users.length
+  });
+});
+
+// Approve or Reject Faculty Request (Admin only)
+export const reviewFacultyRequest = asyncHandler(async (req, res) => {
+  const { userId } = req.params;
+  const { action, rejectionReason } = req.body; // action: 'approve' or 'reject'
+
+  if (!['approve', 'reject'].includes(action)) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Invalid action. Must be "approve" or "reject"'
+    });
+  }
+
+  if (action === 'reject' && !rejectionReason) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Rejection reason is required'
+    });
+  }
+
+  const user = await User.findById(userId);
+  
+  if (!user) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({
+      success: false,
+      message: 'User not found'
+    });
+  }
+
+  if (!user.facultyRequest || user.facultyRequest.status !== 'pending') {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'No pending faculty request found for this user'
+    });
+  }
+
+  if (action === 'approve') {
+    user.role = USER_ROLES.FACULTY;
+    user.facultyRequest.status = 'approved';
+    user.facultyRequest.reviewedAt = new Date();
+    user.facultyRequest.reviewedBy = req.userId;
+  } else {
+    user.facultyRequest.status = 'rejected';
+    user.facultyRequest.reviewedAt = new Date();
+    user.facultyRequest.reviewedBy = req.userId;
+    user.facultyRequest.rejectionReason = rejectionReason;
+  }
+
+  await user.save();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: `Faculty request ${action}d successfully`,
+    data: user
+  });
+});
+

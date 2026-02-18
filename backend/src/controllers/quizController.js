@@ -92,6 +92,7 @@ export const getAllQuizzes = asyncHandler(async (req, res) => {
   console.log('📋 getAllQuizzes called');
   console.log('   - institutionId:', req.institutionId);
   console.log('   - userId:', req.userId);
+  console.log('   - userRole:', req.userRole);
   console.log('   - filters:', { status, subject });
 
   if (!req.institutionId) {
@@ -108,9 +109,15 @@ export const getAllQuizzes = asyncHandler(async (req, res) => {
     ...(subject && { subject })
   };
 
+  // If user is faculty, only show their own quizzes
+  if (req.userRole === 'faculty') {
+    filter.createdBy = req.userId;
+  }
+
   console.log('🔍 Filter:', filter);
 
   const quizzes = await Quiz.find(filter)
+    .populate('createdBy', 'name email')
     .skip(skip)
     .limit(parseInt(limit))
     .sort({ createdAt: -1 });
@@ -158,19 +165,7 @@ export const updateQuiz = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { title, description, duration, totalMarks, passingMarks, status, proctoring } = req.body;
 
-  const quiz = await Quiz.findByIdAndUpdate(
-    id,
-    {
-      title,
-      description,
-      duration,
-      totalMarks,
-      passingMarks,
-      status,
-      proctoring
-    },
-    { new: true, runValidators: true }
-  );
+  const quiz = await Quiz.findById(id);
 
   if (!quiz) {
     return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -178,6 +173,25 @@ export const updateQuiz = asyncHandler(async (req, res) => {
       message: 'Quiz not found'
     });
   }
+
+  // Check permissions: Faculty can only edit their own quizzes, Admin can edit all
+  if (req.userRole === 'faculty' && quiz.createdBy.toString() !== req.userId.toString()) {
+    return res.status(HTTP_STATUS.FORBIDDEN).json({
+      success: false,
+      message: 'You do not have permission to edit this quiz'
+    });
+  }
+
+  // Update quiz fields
+  if (title) quiz.title = title;
+  if (description !== undefined) quiz.description = description;
+  if (duration) quiz.duration = duration;
+  if (totalMarks !== undefined) quiz.totalMarks = totalMarks;
+  if (passingMarks !== undefined) quiz.passingMarks = passingMarks;
+  if (status) quiz.status = status;
+  if (proctoring) quiz.proctoring = proctoring;
+
+  await quiz.save();
 
   res.status(HTTP_STATUS.OK).json({
     success: true,
@@ -190,7 +204,7 @@ export const updateQuiz = asyncHandler(async (req, res) => {
 export const deleteQuiz = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const quiz = await Quiz.findByIdAndDelete(id);
+  const quiz = await Quiz.findById(id);
 
   if (!quiz) {
     return res.status(HTTP_STATUS.NOT_FOUND).json({
@@ -199,8 +213,19 @@ export const deleteQuiz = asyncHandler(async (req, res) => {
     });
   }
 
+  // Check permissions: Faculty can only delete their own quizzes, Admin can delete all
+  if (req.userRole === 'faculty' && quiz.createdBy.toString() !== req.userId.toString()) {
+    return res.status(HTTP_STATUS.FORBIDDEN).json({
+      success: false,
+      message: 'You do not have permission to delete this quiz'
+    });
+  }
+
   // Delete associated questions
   await Question.deleteMany({ quiz: id });
+
+  // Delete the quiz
+  await quiz.deleteOne();
 
   res.status(HTTP_STATUS.OK).json({
     success: true,

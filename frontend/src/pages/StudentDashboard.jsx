@@ -16,7 +16,8 @@ import {
   BarChart3,
   User,
   Settings,
-  LogOut
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -32,6 +33,8 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import { useAuthStore } from '../context/store';
 import DashboardSidebar from '../components/Layout/DashboardSidebar';
 import { getMyQuizzes } from '../services/myQuizService';
+import '../styles/dashboards.css';
+import '../styles/dark-mode.css';
 
 // Register ChartJS components
 ChartJS.register(
@@ -72,6 +75,7 @@ const StudentDashboard = () => {
     { icon: BookOpen, label: 'Available Quizzes', id: 'quizzes', action: () => navigate('/available-quizzes') },
     { icon: Award, label: 'My Results', id: 'results' },
     { icon: Target, label: 'Progress', id: 'progress' },
+    { icon: UserCheck, label: 'Request Faculty Role', id: 'request-faculty', action: () => navigate('/request-faculty') },
     { icon: User, label: 'Profile', id: 'profile' },
     { icon: Settings, label: 'Settings', id: 'settings' }
   ];
@@ -226,22 +230,24 @@ const StudentDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-teal-50">
       {/* Mobile Header */}
-      <div className="lg:hidden bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-30">
+      <div className="lg:hidden bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between sticky top-0 z-30 transition-colors">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
             PL
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 text-lg">Proctolearn</h1>
-            <span className="text-xs text-emerald-600 font-medium uppercase tracking-wider">Student</span>
+            <h1 className="font-bold text-slate-800 dark:text-slate-100 text-lg">Proctolearn</h1>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">Student</span>
           </div>
         </div>
-        <button 
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
-        >
-          <Menu size={24} className="text-slate-600" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+          >
+            <Menu size={24} className="text-slate-600 dark:text-slate-300" />
+          </button>
+        </div>
       </div>
 
       <div className="flex h-screen lg:h-auto">

@@ -9,6 +9,7 @@ import { globalErrorHandler } from './utils/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import institutionRoutes from './routes/institutionRoutes.js';
 import { initSocket } from './sockets/quizSocket.js';
 
 dotenv.config();
@@ -45,6 +46,7 @@ app.set('io', io);
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', userRoutes);
 app.use('/api/quizzes', quizRoutes);
+app.use('/api/institutions', institutionRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {

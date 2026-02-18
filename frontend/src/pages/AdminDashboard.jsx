@@ -20,9 +20,27 @@ import {
 import { Bar, Doughnut } from 'react-chartjs-2';
 import { useAuthStore } from '../context/store';
 import '../styles/dashboards.css';
+import '../styles/mobile-sidebar.css';
+import '../styles/enhanced-dashboard.css';
+import '../styles/dark-mode.css';
 import NotificationsDropdown from '../components/Common/NotificationsDropdown';
 import DashboardSidebar from '../components/Layout/DashboardSidebar';
+import HamburgerMenu from '../components/Layout/HamburgerMenu';
 import LandingNavbar from '../components/Layout/LandingNavbar';
+import ModernStatCard from '../components/Cards/ModernStatCard';
+import MetricCard from '../components/Cards/MetricCard';
+import ModernTable from '../components/Tables/ModernTable';
+import SkeletonLoader from '../components/Common/SkeletonLoader';
+import FacultyRequestsPanel from '../components/Admin/FacultyRequestsPanel';
+import UniversitiesPanel from '../components/Admin/UniversitiesPanel';
+import SystemSettingsPanel from '../components/Admin/SystemSettingsPanel';
+import { 
+  AnimatedLineChart, 
+  AnimatedAreaChart, 
+  AnimatedBarChart, 
+  AnimatedDoughnutChart,
+  PerformanceChart 
+} from '../components';
 
 // Register ChartJS components
 ChartJS.register(
@@ -100,6 +118,18 @@ const AdminDashboard = () => {
         const quizzesData = await quizzesRes.json();
         const fetchedQuizzes = quizzesData.data || [];
 
+        // Fetch pending faculty requests
+        let pendingFacultyRequests = 0;
+        try {
+          const requestsRes = await fetch(`${API_BASE_URL}/auth/faculty-requests?status=pending`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const requestsData = await requestsRes.json();
+          pendingFacultyRequests = requestsData.count || 0;
+        } catch (err) {
+          console.log('Could not fetch faculty requests:', err);
+        }
+
         // Store all data
         setAllUsers(fetchedUsers);
         setAllQuizzes(fetchedQuizzes);
@@ -116,7 +146,7 @@ const AdminDashboard = () => {
           students,
           totalQuizzes: fetchedQuizzes.length,
           activeQuizzes: activeQuizzesCount,
-          pendingRequests: 0,
+          pendingRequests: pendingFacultyRequests,
           completedQuizzes: completedQuizzesCount
         });
 
@@ -149,11 +179,13 @@ const AdminDashboard = () => {
   // Navigation Items
   const tabs = [
     { id: 'overview', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'quizzes', label: 'Quizzes', icon: BookOpen }, // Merged view
-    { id: 'users', label: 'Users', icon: Users }, // Merged view
+    { id: 'universities', label: 'Universities', icon: School },
+    { id: 'faculty-requests', label: 'Faculty Requests', icon: UserCheck, badge: stats.pendingRequests > 0 ? stats.pendingRequests : null },
+    { id: 'quizzes', label: 'Quizzes', icon: BookOpen },
+    { id: 'users', label: 'Users', icon: Users },
     { id: 'monitor', label: 'Monitor', icon: Eye, path: '/monitor-sessions' },
     { id: 'reports', label: 'Reports', icon: BarChart3 },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'system-settings', label: 'System Settings', icon: Settings },
   ];
 
   // Colors for gradients
@@ -256,6 +288,52 @@ const AdminDashboard = () => {
     cutout: '75%',
   };
 
+  // Generate time-series data for analytics charts
+  const generateTimeSeriesLabels = (days) => {
+    const labels = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+    }
+    return labels;
+  };
+
+  // Generate user growth data (simulated growth trend)
+  const generateUserGrowthData = () => {
+    const days = 30;
+    const currentTotal = allUsers.length || 50;
+    const startTotal = Math.max(10, currentTotal - Math.floor(Math.random() * 20 + 10));
+    const data = [];
+    
+    for (let i = 0; i < days; i++) {
+      const progress = i / (days - 1);
+      const randomVariation = Math.random() * 3 - 1;
+      const value = Math.floor(startTotal + (currentTotal - startTotal) * progress + randomVariation);
+      data.push(Math.max(startTotal, value));
+    }
+    return data;
+  };
+
+  // Generate quiz creation timeline data
+  const generateQuizCreationData = () => {
+    const days = 30;
+    return Array.from({ length: days }, () => Math.floor(Math.random() * 5));
+  };
+
+  // Generate daily activity data
+  const generateDailyActivityData = () => {
+    const days = 30;
+    const activeUsers = Array.from({ length: days }, () => 
+      Math.floor(Math.random() * (80 - 40 + 1) + 40)
+    );
+    const quizAttempts = Array.from({ length: days }, () => 
+      Math.floor(Math.random() * (60 - 30 + 1) + 30)
+    );
+    return { activeUsers, quizAttempts };
+  };
+
   const downloadCSV = (data, filename) => {
     if (!data.length) return toast.error('No data to export');
     const headers = Object.keys(data[0]).join(',');
@@ -271,7 +349,7 @@ const AdminDashboard = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50 font-sans pt-[72px]">
+    <div className="dashboard-container flex min-h-screen font-sans pt-[72px]">
       <LandingNavbar />
       
       {/* Sidebar */}
@@ -292,13 +370,11 @@ const AdminDashboard = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-[calc(100vh-72px)] overflow-hidden relative">
-        {/* Header Removed as per user request */}
-
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative scroll-smooth bg-slate-50/50">
-          {/* Background Glow */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-4 lg:p-8 relative scroll-smooth">
+          {/* Animated cursor glow effect (desktop only) */}
           <div 
             ref={cursorGlowRef}
-            className="fixed w-20 h-20 bg-indigo-500/30 rounded-full pointer-events-none blur-xl z-0 transition-transform duration-100 ease-out hidden lg:block"
+            className="fixed w-24 h-24 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full pointer-events-none blur-3xl z-0 transition-transform duration-200 ease-out hidden lg:block"
           />
 
           <motion.div 
@@ -311,208 +387,454 @@ const AdminDashboard = () => {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <button 
-                  onClick={() => setSidebarOpen(true)}
-                  className="lg:hidden mb-2 inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm text-slate-600 hover:bg-slate-50 transition"
-                >
-                  <Menu size={18} />
-                  <span className="font-medium text-sm">Menu</span>
-                </button>
-                <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
-                  Welcome back, {user?.firstName || 'Admin'}! 👋
-                </h1>
-                <p className="text-slate-600 mt-1">Here's an overview of your institution's performance.</p>
+                <div className="lg:hidden mb-3">
+                  <HamburgerMenu
+                    isOpen={sidebarOpen}
+                    onToggle={() => setSidebarOpen(!sidebarOpen)}
+                    variant="outline"
+                    size="md"
+                    showLabel={true}
+                  />
+                </div>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-extrabold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent mb-2">
+                    Welcome back, {user?.firstName || 'Admin'}! 👋
+                  </h1>
+                  <p className="text-slate-600 text-base">
+                    Here's an overview of your institution's performance today.
+                  </p>
+                </div>
               </div>
-              <button 
-                onClick={() => navigate('/create-quiz')}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-95 font-medium"
-              >
-                <Plus size={18} />
-                New Quiz
-              </button>
+              <div className="flex flex-wrap gap-3">
+                <motion.button 
+                  onClick={() => navigate('/create-quiz')}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="btn-primary inline-flex items-center gap-2 px-5 py-3 rounded-xl font-semibold shadow-lg"
+                >
+                  <Plus size={20} strokeWidth={2.5} />
+                  <span>Create Quiz</span>
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => downloadCSV(allUsers, 'dashboard-export.csv')}
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm"
+                >
+                  <Download size={18} strokeWidth={2.5} />
+                  <span>Export</span>
+                </motion.button>
+              </div>
             </div>
 
             {activeTab === 'overview' && (
               <>
-                {/* Stats Grid - Gradient Cards */}
+                {/* Stats Grid - Modern Gradient Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                  {gradientCards.map((stat, idx) => (
-                    <motion.div
-                      key={stat.title}
-                      variants={itemVariants}
-                      custom={idx}
-                      className={`relative overflow-hidden rounded-2xl p-4 text-white shadow-md transition-all duration-300 hover:scale-[1.03] hover:shadow-xl group bg-gradient-to-br ${
-                        stat.color === 'blue' ? 'from-blue-600 via-blue-500 to-indigo-600' :
-                        stat.color === 'purple' ? 'from-purple-600 via-purple-500 to-fuchsia-600' :
-                        stat.color === 'orange' ? 'from-orange-500 via-orange-400 to-red-500' :
-                        'from-emerald-500 via-emerald-400 to-teal-600'
-                      }`}
-                    >
-                      {/* Abstract Background Shapes */}
-                      <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl transition-transform duration-700 group-hover:scale-150" />
-                      <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-black/5 rounded-full blur-xl" />
-
-                      <div className="absolute top-0 right-0 p-3 opacity-10 transition-transform duration-500 ease-out group-hover:rotate-12 group-hover:scale-110">
-                        <stat.icon size={80} />
-                      </div>
-                      <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm border border-white/10 shadow-inner group-hover:bg-white/30 transition-colors">
-                            <stat.icon size={20} />
-                          </div>
-                          <span className="flex items-center gap-1 text-[10px] font-bold bg-black/20 text-white px-2.5 py-1 rounded-full backdrop-blur-md border border-white/5">
-                            {stat.trend === 'up' ? <TrendingUp size={10} className="text-emerald-300" /> : <Activity size={10} />}
-                            {stat.change}
-                          </span>
-                        </div>
-                        <p className="text-sm text-white/90 font-medium mb-0.5 tracking-wide">{stat.title}</p>
-                        <h3 className="text-3xl font-extrabold mb-1 tracking-tight drop-shadow-sm">{stat.value}</h3>
-                        <p className="text-xs text-white/70 font-medium">{stat.subtitle}</p>
-                      </div>
-                    </motion.div>
-                  ))}
+                  {loading ? (
+                    <SkeletonLoader type="stat-card" count={4} />
+                  ) : (
+                    gradientCards.map((stat, idx) => (
+                      <ModernStatCard
+                        key={stat.title}
+                        title={stat.title}
+                        value={stat.value}
+                        subtitle={stat.subtitle}
+                        icon={stat.icon}
+                        change={stat.change}
+                        trend={stat.trend}
+                        color={stat.color}
+                        delay={idx}
+                      />
+                    ))
+                  )}
                 </div>
 
                 {/* Secondary Metrics Bar */}
-                <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {secondaryMetrics.map((sm, i) => (
-                    <div key={i} className="flex items-center gap-3 bg-white p-4 rounded-xl border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 hover:bg-indigo-50/40 hover:border-indigo-200">
-                      <div className={`p-2 rounded-lg ${sm.bg} ${sm.color}`}>
-                        <sm.icon size={20} />
-                      </div>
-                      <div>
-                        <p className="text-slate-500 text-xs font-semibold uppercase">{sm.label}</p>
-                        <p className="text-slate-900 font-bold">{sm.value}</p>
-                      </div>
-                    </div>
-                  ))}
+                <motion.div 
+                  variants={itemVariants} 
+                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                >
+                  {loading ? (
+                    <SkeletonLoader type="mini-card" count={4} />
+                  ) : (
+                    secondaryMetrics.map((sm, i) => (
+                      <MetricCard
+                        key={sm.label}
+                        label={sm.label}
+                        value={sm.value}
+                        icon={sm.icon}
+                        color={sm.color.replace('text-', '').replace('-600', '')}
+                        delay={i}
+                      />
+                    ))
+                  )}
                 </motion.div>
 
+                {/* Platform Analytics - User Growth & Quiz Creation */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {loading ? (
+                    <>
+                      <SkeletonLoader type="chart" />
+                      <SkeletonLoader type="chart" />
+                    </>
+                  ) : (
+                    <>
+                      <AnimatedLineChart
+                        title="User Growth Over Time"
+                        subtitle="Total registered users (students + faculty)"
+                        labels={generateTimeSeriesLabels(30)}
+                        datasets={[
+                          {
+                            label: 'Total Users',
+                            data: generateUserGrowthData(),
+                            borderColor: 'rgb(99, 102, 241)',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: 'rgb(99, 102, 241)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                          },
+                        ]}
+                        height={350}
+                        timeframe="Last 30 days"
+                      />
+                      
+                      <AnimatedLineChart
+                        title="Quiz Creation Timeline"
+                        subtitle="New quizzes created daily"
+                        labels={generateTimeSeriesLabels(30)}
+                        datasets={[
+                          {
+                            label: 'Quizzes Created',
+                            data: generateQuizCreationData(),
+                            borderColor: 'rgb(168, 85, 247)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: 'rgb(168, 85, 247)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                          },
+                        ]}
+                        height={350}
+                        timeframe="Last 30 days"
+                      />
+                    </>
+                  )}
+                </div>
+
+                {/* Daily Activity Comparison */}
+                {!loading && (
+                  <AnimatedAreaChart
+                    title="Daily Platform Activity"
+                    subtitle="Active users vs quiz attempts over time"
+                    labels={generateTimeSeriesLabels(30)}
+                    dataset1={{
+                      label: 'Active Users',
+                      data: generateDailyActivityData().activeUsers,
+                      borderColor: 'rgb(16, 185, 129)',
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    }}
+                    dataset2={{
+                      label: 'Quiz Attempts',
+                      data: generateDailyActivityData().quizAttempts,
+                      borderColor: 'rgb(251, 146, 60)',
+                      backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                    }}
+                    height={350}
+                  />
+                )}
+
+                {/* Platform Analytics - User Growth & Quiz Creation */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {loading ? (
+                    <>
+                      <SkeletonLoader type="chart" />
+                      <SkeletonLoader type="chart" />
+                    </>
+                  ) : (
+                    <>
+                      <AnimatedLineChart
+                        title="User Growth Over Time"
+                        subtitle="Total registered users (students + faculty)"
+                        labels={generateTimeSeriesLabels(30)}
+                        datasets={[
+                          {
+                            label: 'Total Users',
+                            data: generateUserGrowthData(),
+                            borderColor: 'rgb(99, 102, 241)',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: 'rgb(99, 102, 241)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                          },
+                        ]}
+                        height={350}
+                        timeframe="Last 30 days"
+                      />
+                      
+                      <AnimatedLineChart
+                        title="Quiz Creation Timeline"
+                        subtitle="New quizzes created daily"
+                        labels={generateTimeSeriesLabels(30)}
+                        datasets={[
+                          {
+                            label: 'Quizzes Created',
+                            data: generateQuizCreationData(),
+                            borderColor: 'rgb(168, 85, 247)',
+                            backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 3,
+                            pointRadius: 0,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: 'rgb(168, 85, 247)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                          },
+                        ]}
+                        height={350}
+                        timeframe="Last 30 days"
+                      />
+                    </>
+                  )}
+                </div>
+
+                {/* Daily Activity Comparison */}
+                {!loading && (
+                  <AnimatedAreaChart
+                    title="Daily Platform Activity"
+                    subtitle="Active users vs quiz attempts over time"
+                    labels={generateTimeSeriesLabels(30)}
+                    dataset1={{
+                      label: 'Active Users',
+                      data: generateDailyActivityData().activeUsers,
+                      borderColor: 'rgb(16, 185, 129)',
+                      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    }}
+                    dataset2={{
+                      label: 'Quiz Attempts',
+                      data: generateDailyActivityData().quizAttempts,
+                      borderColor: 'rgb(251, 146, 60)',
+                      backgroundColor: 'rgba(251, 146, 60, 0.1)',
+                    }}
+                    height={350}
+                  />
+                )}
+
+                {/* Performance Chart - Time Series */}
+                {!loading && (
+                  <PerformanceChart 
+                    title="Quiz Performance Over Time"
+                    subtitle="Completion rates, participation, and average scores"
+                    height={350}
+                    period="30 days"
+                  />
+                )}
+                
                 {/* Charts Section */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                  <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-lg hover:border-indigo-200">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-slate-800">Quiz Categories</h3>
-                      <button className="text-slate-400 hover:bg-slate-50 p-1 rounded"><MoreVertical size={20}/></button>
-                    </div>
-                    <div className="h-72">
-                      <Bar data={quizCategoryData} options={chartOptions} />
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div variants={itemVariants} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm transition-all duration-300 hover:shadow-lg hover:border-indigo-200">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-slate-800">Quiz Status Distribution</h3>
-                      <button className="text-slate-400 hover:bg-slate-50 p-1 rounded"><MoreVertical size={20}/></button>
-                    </div>
-                    <div className="h-72 flex items-center justify-center">
-                      <Doughnut data={resultStatusData} options={doughnutOptions} />
-                    </div>
-                  </motion.div>
+                  {loading ? (
+                    <>
+                      <SkeletonLoader type="chart" />
+                      <SkeletonLoader type="chart" />
+                    </>
+                  ) : (
+                    <>
+                      <AnimatedBarChart
+                        title="Quiz Categories"
+                        subtitle="Distribution by subject"
+                        labels={['Math', 'Science', 'History', 'Programming', 'Physics', 'General']}
+                        data={[12, 19, 3, 5, 2, 3]}
+                        colorScheme="indigo"
+                        height={350}
+                      />
+                      
+                      <AnimatedDoughnutChart
+                        title="Quiz Status Distribution"
+                        subtitle="Current quiz lifecycle stages"
+                        labels={['Active', 'Closed', 'Draft']}
+                        data={[stats.activeQuizzes, stats.completedQuizzes, stats.totalQuizzes - (stats.activeQuizzes + stats.completedQuizzes)]}
+                        colors={['rgba(34, 197, 94, 0.8)', 'rgba(239, 68, 68, 0.8)', 'rgba(156, 163, 175, 0.8)']}
+                        height={350}
+                      />
+                    </>
+                  )}
                 </div>
 
                 {/* Recent Activity / Tables */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Recent Users */}
-                  <motion.div variants={itemVariants} className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-indigo-200">
-                    <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                      <h3 className="font-bold text-lg text-slate-800">Recent Users</h3>
-                      <button onClick={() => downloadCSV(allUsers, 'users.csv')} className="text-sm text-indigo-600 font-medium hover:underline">Export</button>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-50 text-slate-500">
-                          <tr>
-                            <th className="px-6 py-3 font-medium">Name</th>
-                            <th className="px-6 py-3 font-medium">Role</th>
-                            <th className="px-6 py-3 font-medium">Status</th>
-                            <th className="px-6 py-3 font-medium">Joined</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {recentUsers.map((u, i) => (
-                            <tr key={i} className="group hover:bg-slate-50 transition-colors duration-200 border-l-[3px] border-transparent hover:border-indigo-500">
-                              <td className="px-6 py-4 font-medium text-slate-900 flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 ring-2 ring-white shadow-sm group-hover:bg-white group-hover:scale-110 transition-all duration-300">
-                                  {u.firstName?.[0]}
+                  {/* Recent Users Table */}
+                  <div className="lg:col-span-2">
+                    {loading ? (
+                      <SkeletonLoader type="table" />
+                    ) : (
+                      <ModernTable
+                        title="Recent Users"
+                        data={recentUsers}
+                        columns={[
+                          {
+                            key: 'firstName',
+                            label: 'Name',
+                            sortable: true,
+                            render: (_, row) => (
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold ring-2 ring-white shadow-sm">
+                                  {row.firstName?.[0]}{row.lastName?.[0]}
                                 </div>
-                                <span className="group-hover:text-indigo-700 transition-colors">{u.firstName} {u.lastName}</span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide uppercase border ${
-                                  u.role === 'admin' 
-                                    ? 'bg-red-50 text-red-700 border-red-100 group-hover:bg-red-100'
-                                    : u.role === 'faculty' 
-                                      ? 'bg-blue-50 text-blue-700 border-blue-100 group-hover:bg-blue-100' 
-                                      : 'bg-green-50 text-green-700 border-green-100 group-hover:bg-green-100'
-                                } transition-colors`}>
-                                  {u.role}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className={`flex items-center gap-2 text-xs font-medium ${u.isActive ? 'text-emerald-700' : 'text-slate-500'}`}>
-                                  <span className={`relative flex h-2 w-2`}>
-                                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${u.isActive ? 'bg-emerald-400' : 'hidden'}`}></span>
-                                    <span className={`relative inline-flex rounded-full h-2 w-2 ${u.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                                  </span>
-                                  {u.isActive ? 'Active' : 'Inactive'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-xs font-medium text-slate-500 group-hover:text-slate-800 transition-colors">
-                                {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                              </td>
-                            </tr>
-                          ))}
-                          {recentUsers.length === 0 && (
-                            <tr><td colSpan="4" className="text-center py-8 text-slate-500">No users found</td></tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </motion.div>
+                                <div>
+                                  <p className="font-semibold text-slate-900">
+                                    {row.firstName} {row.lastName}
+                                  </p>
+                                  <p className="text-xs text-slate-500">{row.email}</p>
+                                </div>
+                              </div>
+                            )
+                          },
+                          {
+                            key: 'role',
+                            label: 'Role',
+                            sortable: true,
+                            render: (role) => (
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase border ${
+                                role === 'admin' 
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : role === 'faculty' 
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}>
+                                {role}
+                              </span>
+                            )
+                          },
+                          {
+                            key: 'isActive',
+                            label: 'Status',
+                            render: (isActive) => (
+                              <span className={`inline-flex items-center gap-2 text-xs font-semibold ${
+                                isActive ? 'text-emerald-700' : 'text-slate-500'
+                              }`}>
+                                <span className={`badge-dot ${isActive ? 'badge-dot-success' : 'badge-dot-danger'}`} />
+                                {isActive ? 'Active' : 'Inactive'}
+                              </span>
+                            )
+                          },
+                          {
+                            key: 'createdAt',
+                            label: 'Joined',
+                            sortable: true,
+                            render: (date) => (
+                              <span className="text-sm text-slate-600">
+                                {new Date(date).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric' 
+                                })}
+                              </span>
+                            )
+                          }
+                        ]}
+                        searchable={true}
+                        onExport={(data) => downloadCSV(data, 'users.csv')}
+                        emptyMessage="No users found"
+                        actions={true}
+                      />
+                    )}
+                  </div>
 
                   {/* System Health / Quick Stats */}
-                  <motion.div variants={itemVariants} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 transition-all duration-300 hover:shadow-lg hover:border-indigo-200">
-                    <h3 className="font-bold text-lg text-slate-800 mb-6">System Health</h3>
+                  <motion.div 
+                    variants={itemVariants} 
+                    className="dashboard-card bg-white rounded-2xl border border-slate-200 p-6"
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="font-bold text-lg text-slate-800">System Health</h3>
+                      <span className="badge-dot badge-dot-success"></span>
+                    </div>
                     <div className="space-y-6">
                       <div>
                         <div className="flex justify-between text-sm mb-2">
-                          <span className="text-slate-600">Server Load</span>
-                          <span className="font-semibold text-emerald-600">24%</span>
+                          <span className="font-medium text-slate-700">Server Load</span>
+                          <span className="font-bold text-emerald-600">24%</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full" style={{ width: '24%' }} />
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-slate-600">Memory Usage</span>
-                          <span className="font-semibold text-blue-600">58%</span>
-                        </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full" style={{ width: '58%' }} />
+                        <div className="progress-bar">
+                          <motion.div 
+                            className="progress-bar-fill"
+                            initial={{ width: 0 }}
+                            animate={{ width: '24%' }}
+                            transition={{ duration: 1, delay: 0.5 }}
+                            style={{ background: 'linear-gradient(90deg, #10b981, #059669)' }}
+                          />
                         </div>
                       </div>
                       <div>
                         <div className="flex justify-between text-sm mb-2">
-                          <span className="text-slate-600">Storage</span>
-                          <span className="font-semibold text-orange-600">82%</span>
+                          <span className="font-medium text-slate-700">Memory Usage</span>
+                          <span className="font-bold text-blue-600">58%</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-orange-500 rounded-full" style={{ width: '82%' }} />
+                        <div className="progress-bar">
+                          <motion.div 
+                            className="progress-bar-fill"
+                            initial={{ width: 0 }}
+                            animate={{ width: '58%' }}
+                            transition={{ duration: 1, delay: 0.6 }}
+                            style={{ background: 'linear-gradient(90deg, #3b82f6, #2563eb)' }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="font-medium text-slate-700">Storage</span>
+                          <span className="font-bold text-orange-600">82%</span>
+                        </div>
+                        <div className="progress-bar">
+                          <motion.div 
+                            className="progress-bar-fill"
+                            initial={{ width: 0 }}
+                            animate={{ width: '82%' }}
+                            transition={{ duration: 1, delay: 0.7 }}
+                            style={{ background: 'linear-gradient(90deg, #f59e0b, #d97706)' }}
+                          />
                         </div>
                       </div>
                       
-                      <div className="pt-4 border-t border-slate-100 mt-6">
-                        <h4 className="text-sm font-semibold text-slate-900 mb-3">Pending Tasks</h4>
+                      <div className="pt-4 border-t border-slate-200 mt-6">
+                        <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+                          <CheckCircle size={16} className="text-emerald-500" />
+                          Recent Activity
+                        </h4>
                         <div className="space-y-3">
-                          {[1, 2, 3].map((_, i) => (
-                            <div key={i} className="flex items-start gap-3">
-                              <div className="mt-1 min-w-[16px]">
-                                <div className="w-4 h-4 rounded border border-slate-300" />
+                          {[
+                            { text: 'Database backup completed', time: '5 min ago', color: 'emerald' },
+                            { text: 'New quiz published', time: '12 min ago', color: 'blue' },
+                            { text: 'User registration spike', time: '30 min ago', color: 'orange' }
+                          ].map((activity, i) => (
+                            <motion.div 
+                              key={i}
+                              initial={{ opacity: 0, x: -10 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              transition={{ delay: i * 0.1 + 0.8 }}
+                              className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer"
+                            >
+                              <div className={`badge-dot badge-dot-${activity.color} mt-1.5`}></div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-800">{activity.text}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{activity.time}</p>
                               </div>
-                              <p className="text-sm text-slate-600 line-clamp-1">Review faculty application #{100+i}</p>
-                            </div>
+                            </motion.div>
                           ))}
                         </div>
                       </div>
@@ -520,6 +842,36 @@ const AdminDashboard = () => {
                   </motion.div>
                 </div>
               </>
+            )}
+
+            {activeTab === 'faculty-requests' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <FacultyRequestsPanel />
+              </motion.div>
+            )}
+
+            {activeTab === 'universities' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <UniversitiesPanel />
+              </motion.div>
+            )}
+
+            {activeTab === 'system-settings' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }} 
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                <SystemSettingsPanel />
+              </motion.div>
             )}
 
             {activeTab === 'users' && (

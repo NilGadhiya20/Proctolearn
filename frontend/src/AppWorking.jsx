@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import muiTheme from './theme/muiTheme';
+import { ThemeProvider as CustomThemeProvider } from './context/themeContext';
 
 // Scroll to top on route change with smooth animation
 function ScrollToTop() {
@@ -42,6 +43,7 @@ const Profile = React.lazy(() => import('./pages/Profile').catch(e => { console.
 const FacultyLiveMonitoring = React.lazy(() => import('./pages/FacultyLiveMonitoring').catch(e => { console.error('FacultyLiveMonitoring import error:', e); return { default: () => <div>Error loading FacultyLiveMonitoring</div> }; }));
 const Chat = React.lazy(() => import('./pages/Chat').catch(e => { console.error('Chat import error:', e); return { default: () => <div>Error loading Chat</div> }; }));
 const Support = React.lazy(() => import('./pages/Support').catch(e => { console.error('Support import error:', e); return { default: () => <div>Error loading Support</div> }; }));
+const RequestFacultyRole = React.lazy(() => import('./components/Student/RequestFacultyRole').catch(e => { console.error('RequestFacultyRole import error:', e); return { default: () => <div>Error loading RequestFacultyRole</div> }; }));
 
 // Placeholder page for settings and support
 const SettingsPage = () => <div style={{ padding: '20px' }}>Settings Page - Coming Soon</div>;
@@ -55,49 +57,52 @@ const AppWorking = () => {
   console.log('AppWorking rendering');
 
   return (
-    <ThemeProvider theme={muiTheme}>
-      <CssBaseline />
-      <BrowserRouter>
-        <ScrollToTop />
-        <React.Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/manage-users" element={<ManageUsers />} />
-            <Route path="/system-settings" element={<SystemSettings />} />
-            
-            {/* Faculty Routes */}
-            <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
-            <Route path="/my-quizzes" element={<MyQuizzes />} />
-            <Route path="/create-quiz" element={<CreateQuiz />} />
-            <Route path="/grade-submissions" element={<GradeSubmissions />} />
-            <Route path="/view-reports" element={<ViewReports />} />
-            <Route path="/monitor-sessions" element={<MonitorSessions />} />
-            <Route path="/review-flags" element={<ReviewFlags />} />
-            <Route path="/monitoring" element={<FacultyLiveMonitoring />} />
-            
-            {/* Student Routes */}
-            <Route path="/student/dashboard" element={<StudentDashboard />} />
-            <Route path="/available-quizzes" element={<AvailableQuizzes />} />
-            <Route path="/quiz/:quizId" element={<QuizAttempt />} />
-            
-            {/* Common Routes - Available for all roles */}
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/support" element={<Support />} />
-            <Route path="/chat" element={<Chat />} />
-            
-            {/* Fallback Route */}
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </React.Suspense>
-      </BrowserRouter>
-    </ThemeProvider>
+    <CustomThemeProvider>
+      <ThemeProvider theme={muiTheme}>
+        <CssBaseline />
+        <BrowserRouter>
+          <ScrollToTop />
+          <React.Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              
+              {/* Admin Routes */}
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/manage-users" element={<ManageUsers />} />
+              <Route path="/system-settings" element={<SystemSettings />} />
+              
+              {/* Faculty Routes */}
+              <Route path="/faculty/dashboard" element={<FacultyDashboard />} />
+              <Route path="/my-quizzes" element={<MyQuizzes />} />
+              <Route path="/create-quiz" element={<CreateQuiz />} />
+              <Route path="/grade-submissions" element={<GradeSubmissions />} />
+              <Route path="/view-reports" element={<ViewReports />} />
+              <Route path="/monitor-sessions" element={<MonitorSessions />} />
+              <Route path="/review-flags" element={<ReviewFlags />} />
+              <Route path="/monitoring" element={<FacultyLiveMonitoring />} />
+              
+              {/* Student Routes */}
+              <Route path="/student/dashboard" element={<StudentDashboard />} />
+              <Route path="/available-quizzes" element={<AvailableQuizzes />} />
+              <Route path="/quiz/:quizId" element={<QuizAttempt />} />
+              <Route path="/request-faculty" element={<RequestFacultyRole />} />
+              
+              {/* Common Routes - Available for all roles */}
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/chat" element={<Chat />} />
+              
+              {/* Fallback Route */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </React.Suspense>
+        </BrowserRouter>
+      </ThemeProvider>
+    </CustomThemeProvider>
   );
 };
 

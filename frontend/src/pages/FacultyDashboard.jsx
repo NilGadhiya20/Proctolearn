@@ -9,6 +9,8 @@ import socket from '../socket';
 import { ResponsivePageLayout } from '../components/Layout/ResponsivePageLayout';
 import { useAuthStore } from '../context/store';
 import '../styles/dashboards.css';
+import '../styles/dark-mode.css';
+import '../styles/dashboards.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -208,15 +210,17 @@ const FacultyDashboard = () => {
             </div>
 
             <div className="relative z-10">
-              <motion.div variants={floatingVariants} initial="initial" animate="animate">
-                <p className="text-lg font-semibold opacity-90 mb-2">📚 Faculty Portal</p>
-                <h1 className="text-4xl md:text-5xl font-bold mb-3">
-                  Welcome, {user?.firstName || 'Faculty'}! 👨‍🏫
-                </h1>
-                <p className="text-lg opacity-90 max-w-2xl">
-                  Create quizzes, manage students, monitor live sessions and grade submissions effectively.
-                </p>
-              </motion.div>
+              <div className="flex items-center justify-between mb-4">
+                <motion.div variants={floatingVariants} initial="initial" animate="animate">
+                  <p className="text-lg font-semibold opacity-90 mb-2">📚 Faculty Portal</p>
+                  <h1 className="text-4xl md:text-5xl font-bold mb-3">
+                    Welcome, {user?.firstName || 'Faculty'}! 👨‍🏫
+                  </h1>
+                  <p className="text-lg opacity-90 max-w-2xl">
+                    Create quizzes, manage students, monitor live sessions and grade submissions effectively.
+                  </p>
+                </motion.div>
+              </div>
             </div>
           </motion.div>
 

@@ -73,6 +73,22 @@ const userSchema = new mongoose.Schema(
       type: String,
       sparse: true,
       unique: true
+    },
+    facultyRequest: {
+      status: {
+        type: String,
+        enum: ['none', 'pending', 'approved', 'rejected'],
+        default: 'none'
+      },
+      requestedAt: Date,
+      reason: String,
+      qualifications: String,
+      reviewedAt: Date,
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      rejectionReason: String
     }
   },
   {

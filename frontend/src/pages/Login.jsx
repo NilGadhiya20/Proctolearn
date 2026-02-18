@@ -106,6 +106,14 @@ export default function Login() {
 
       if (!hasOAuthParams) return;
 
+      // Check if we're in a popup window
+      if (window.opener) {
+        console.log('🔵 OAuth callback detected in popup, processing...');
+        await completeSupabaseOAuth(); // This will handle sending message to parent
+        return;
+      }
+
+      // Handle non-popup OAuth callback (fallback for direct navigation)
       setLoading(true);
 
       try {
@@ -279,10 +287,45 @@ export default function Login() {
     
     try {
       if (provider === 'Google') {
-        await signInWithGoogle();
-        // signInWithGoogle will redirect. If it does not, we fall back to clearing loading state.
-        setLoading(false);
-        return;
+        console.log('🔵 Starting Google popup login...');
+        
+        // Call the popup-style Google OAuth
+        const result = await signInWithGoogle('PPSU');
+        
+        if (!result?.session?.provider_token) {
+          throw new Error('Google provider token not returned from Supabase.');
+        }
+
+        console.log('✅ Google OAuth successful, authenticating with backend...');
+
+        // Send the provider token to your backend
+        const response = await apiClient.post('/auth/google', {
+          accessToken: result.session.provider_token,
+          institutionCode: result.institutionCode || 'PPSU'
+        });
+
+        if (response.data.success) {
+          const userData = response.data.data.user;
+          const token = response.data.data.token;
+
+          setToken(token);
+          setUser(userData);
+          localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(userData));
+
+          toast.success(`Welcome, ${userData.firstName}!`);
+
+          const role = userData.role?.toLowerCase();
+          if (role === 'admin') {
+            navigate('/admin/dashboard');
+          } else if (role === 'faculty') {
+            navigate('/faculty/dashboard');
+          } else {
+            navigate('/student/dashboard');
+          }
+        } else {
+          toast.error(response.data.message || 'Google login failed.');
+        }
       } else if (provider === 'Microsoft') {
         toast.info('Microsoft login coming soon');
       }
@@ -292,7 +335,14 @@ export default function Login() {
       // Show detailed error message
       let errorMessage = `${provider} login failed. Please try again.`;
       
-      if (error.message) {
+      if (error.message === 'Popup was blocked. Please allow popups for this site.') {
+        errorMessage = '❌ Popup blocked! Please allow popups and try again.';
+      } else if (error.message === 'Google sign-in was cancelled') {
+        errorMessage = 'Google sign-in was cancelled';
+        // Don't show error toast for user-initiated cancellation
+        setLoading(false);
+        return;
+      } else if (error.message) {
         errorMessage = error.message;
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
@@ -866,7 +916,7 @@ export default function Login() {
 
         {/* Animated Loading Overlay */}
         <AnimatePresence>
-          {loading && <AuthLoader message="Authenticating your credentials..." />}
+          {loading && <AuthLoader message="Verifying..." />}
         </AnimatePresence>
 
         <style>{`

@@ -18,7 +18,8 @@ import {
   Plus,
   MessageSquare,
   Menu,
-  X
+  X,
+  GraduationCap
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -93,7 +94,7 @@ const DashboardNavbar = () => {
     const colors = {
       admin: 'from-emerald-500 to-green-600',
       faculty: 'from-indigo-500 to-purple-600',
-      student: 'from-blue-500 to-cyan-500',
+      student: 'from-emerald-500 to-emerald-600',
     };
     return colors[role] || 'from-gray-500 to-slate-600';
   };
@@ -144,14 +145,11 @@ const DashboardNavbar = () => {
             {/* Logo - Left */}
             <Link to="/" className="flex items-center gap-3 flex-shrink-0 group">
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 group-hover:scale-110 transition-all duration-300">
-                <span className="text-white font-bold text-lg">PL</span>
+                <GraduationCap className="text-white w-5 h-5" />
               </div>
               <div className="hidden sm:block">
                 <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight">
                   Proctolearn
-                </span>
-                <span className="block text-[10px] font-bold text-slate-400 tracking-[0.2em] uppercase leading-none mt-0.5">
-                  Secure Portal
                 </span>
               </div>
             </Link>

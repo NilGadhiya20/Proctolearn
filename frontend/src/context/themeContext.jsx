@@ -12,9 +12,13 @@ export const ThemeProvider = ({ children }) => {
   // Persist theme preference
   useEffect(() => {
     localStorage.setItem('proctolearn-dark-mode', JSON.stringify(isDark));
+    
+    // Apply dark class to document root
     if (isDark) {
+      document.documentElement.classList.add('dark');
       document.documentElement.style.colorScheme = 'dark';
     } else {
+      document.documentElement.classList.remove('dark');
       document.documentElement.style.colorScheme = 'light';
     }
   }, [isDark]);

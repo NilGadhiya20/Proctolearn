@@ -70,6 +70,7 @@ export const verifyInstitutionAccess = asyncHandler(async (req, res, next) => {
     }
 
     req.user = user;
+    req.userRole = user.role;
     req.institutionId = user.institution;
     next();
   } catch (error) {

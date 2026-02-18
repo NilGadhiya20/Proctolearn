@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Users, BarChart3, Lock, CheckCircle, Clock, Shield, Award, Video, FileText, Zap, LogIn, HelpCircle, Home, CreditCard, BookOpen, UserPlus } from 'lucide-react';
+import { Eye, Users, BarChart3, Lock, CheckCircle, Clock, Shield, Award, Video, FileText, Zap, LogIn, HelpCircle, Home, CreditCard, BookOpen, UserPlus, GraduationCap } from 'lucide-react';
 import { useAuthStore } from '../context/store';
 import { useEscapeKey, useFocusTrap } from '../hooks/useKeyboardNavigation';
 import LandingNavbar from '../components/Layout/LandingNavbar';
@@ -203,24 +203,24 @@ const Landing = () => {
       <LandingNavbar scrollToSection={scrollToSection} />
 
       {/* Hero Section */}
-      <main className="pt-20">
-      <section className="relative bg-gradient-to-br from-emerald-500 via-emerald-400 to-lime-400 min-h-[85vh] flex items-center overflow-hidden">
+      <main className="pt-16 sm:pt-20">
+      <section className="relative bg-gradient-to-br from-emerald-500 via-emerald-400 to-lime-400 min-h-[80vh] sm:min-h-[85vh] flex items-center overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0icmdiYSgyNTUsMjU1LDI1NSwwLjEpIiBzdHJva2Utd2lkdGg9IjEiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZ3JpZCkiLz48L3N2Zz4=')] opacity-20"></div>
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 lg:py-20 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12 items-center">
             {/* Left Content */}
             <motion.div
               initial={{ opacity: 0, x: -50 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.8 }}
-              className="text-white"
+              className="text-white text-center lg:text-left"
             >
               <motion.div 
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5, type: "spring" }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/20 backdrop-blur-md rounded-full text-sm font-bold mb-8 border border-white/30 pulse-glow"
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/20 backdrop-blur-md rounded-full text-xs sm:text-sm font-bold mb-6 sm:mb-8 border border-white/30 pulse-glow"
               >
                 <motion.div 
                   animate={{ 
@@ -233,22 +233,22 @@ const Landing = () => {
                 OFFICIAL PORTAL
               </motion.div>
               
-              <h1 className="text-6xl lg:text-7xl font-bold mb-6 leading-tight">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold mb-4 sm:mb-6 leading-tight">
                 Smarter<br />
                 Assessment,<br />
                 <span className="text-white/90">Faster Results.</span>
               </h1>
               
-              <p className="text-xl text-white/90 mb-8 leading-relaxed max-w-lg">
+              <p className="text-base sm:text-lg md:text-xl text-white/90 mb-6 sm:mb-8 leading-relaxed max-w-lg mx-auto lg:mx-0">
                 A unified platform for Students, Faculty, and Administrators to create, take, and monitor secure proctored quizzes efficiently.
               </p>
               
-              <div className="flex flex-col sm:flex-row gap-4 mb-12">
-                <Link to="/register" className="bg-white text-emerald-600 font-bold px-10 py-5 rounded-2xl shadow-2xl hover:shadow-[0_20px_60px_rgba(16,185,129,0.6)] hover:-translate-y-2 transition-all duration-400 text-center hover:scale-110 active:scale-95 hover:bg-gradient-to-r hover:from-white hover:to-emerald-50 relative overflow-hidden group">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-8 sm:mb-12 justify-center lg:justify-start">
+                <Link to="/register" className="bg-white text-emerald-600 font-bold px-8 sm:px-10 py-4 sm:py-5 text-sm sm:text-base rounded-xl sm:rounded-2xl shadow-2xl hover:shadow-[0_20px_60px_rgba(16,185,129,0.6)] hover:-translate-y-2 transition-all duration-400 text-center hover:scale-105 sm:hover:scale-110 active:scale-95 hover:bg-gradient-to-r hover:from-white hover:to-emerald-50 relative overflow-hidden group">
                   <span className="relative z-10">Get Started</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-lime-400/20 translate-y-full group-hover:translate-y-0 transition-transform duration-400"></div>
                 </Link>
-                <button onClick={() => scrollToSection('features')} className="bg-white/20 backdrop-blur-md border-3 border-white text-white font-bold px-10 py-5 rounded-2xl hover:bg-white hover:text-emerald-600 hover:shadow-[0_20px_60px_rgba(255,255,255,0.5)] hover:scale-110 hover:-translate-y-2 transition-all duration-400 active:scale-95 relative overflow-hidden group">
+                <button onClick={() => scrollToSection('features')} className="bg-white/20 backdrop-blur-md border-2 sm:border-3 border-white text-white font-bold px-8 sm:px-10 py-4 sm:py-5 text-sm sm:text-base rounded-xl sm:rounded-2xl hover:bg-white hover:text-emerald-600 hover:shadow-[0_20px_60px_rgba(255,255,255,0.5)] hover:scale-105 sm:hover:scale-110 hover:-translate-y-2 transition-all duration-400 active:scale-95 relative overflow-hidden group">
                   <span className="relative z-10">View Features</span>
                   <div className="absolute inset-0 shimmer opacity-0 group-hover:opacity-100 transition-opacity duration-400"></div>
                 </button>
@@ -256,7 +256,7 @@ const Landing = () => {
 
               {/* Stats with Counter Animation */}
               <motion.div 
-                className="grid grid-cols-3 gap-6"
+                className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6"
                 variants={{
                   hidden: { opacity: 0 },
                   show: {
@@ -275,14 +275,14 @@ const Landing = () => {
                     show: { opacity: 1, y: 0 }
                   }}
                   onViewportEnter={() => setUsersInView(true)}
-                  className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                  className="bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                 >
                   <motion.div 
-                    className="text-3xl font-bold mb-1"
+                    className="text-2xl sm:text-3xl font-bold mb-1"
                     initial={{ scale: 1 }}
                     whileHover={{ scale: 1.1 }}
                   >{users}+</motion.div>
-                  <div className="text-sm text-emerald-50">Active Users</div>
+                  <div className="text-xs sm:text-sm text-emerald-50">Active Users</div>
                 </motion.div>
                 <motion.div 
                   variants={{
@@ -290,14 +290,14 @@ const Landing = () => {
                     show: { opacity: 1, y: 0 }
                   }}
                   onViewportEnter={() => setAccuracyInView(true)}
-                  className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                  className="bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                 >
                   <motion.div 
-                    className="text-3xl font-bold mb-1"
+                    className="text-2xl sm:text-3xl font-bold mb-1"
                     initial={{ scale: 1 }}
                     whileHover={{ scale: 1.1 }}
                   >{accuracy}%</motion.div>
-                  <div className="text-sm text-emerald-50">Accuracy</div>
+                  <div className="text-xs sm:text-sm text-emerald-50">Accuracy</div>
                 </motion.div>
                 <motion.div 
                   variants={{
@@ -305,24 +305,24 @@ const Landing = () => {
                     show: { opacity: 1, y: 0 }
                   }}
                   onViewportEnter={() => setSupportInView(true)}
-                  className="bg-white/20 backdrop-blur-md rounded-2xl p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
+                  className="bg-white/20 backdrop-blur-md rounded-xl sm:rounded-2xl p-3 sm:p-4 border border-white/30 hover:bg-white/30 hover:scale-105 hover:shadow-xl transition-all duration-300 cursor-pointer group"
                 >
                   <motion.div 
-                    className="text-3xl font-bold mb-1"
+                    className="text-2xl sm:text-3xl font-bold mb-1"
                     initial={{ scale: 1 }}
                     whileHover={{ scale: 1.1 }}
                   >{support}/7</motion.div>
-                  <div className="text-sm text-emerald-50">Support</div>
+                  <div className="text-xs sm:text-sm text-emerald-50">Support</div>
                 </motion.div>
               </motion.div>
             </motion.div>
 
-            {/* Right Image - GRAMS Style with White Border */}
+            {/* Right Image - Visible on all screens */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="relative group"
+              className="relative group w-full"
             >
               {/* Floating decorative elements */}
               <motion.div
@@ -342,16 +342,17 @@ const Landing = () => {
                 className="absolute -bottom-4 -left-4 w-24 h-24 bg-gradient-to-br from-green-400 to-teal-500 rounded-full blur-xl opacity-60 z-0"
               />
               
-              <div className="relative bg-white rounded-3xl p-3 shadow-2xl overflow-hidden z-10">
-                <div className="overflow-hidden rounded-2xl relative">
+              <div className="relative bg-white rounded-2xl sm:rounded-3xl p-2 sm:p-3 shadow-xl sm:shadow-2xl overflow-hidden z-10">
+                <div className="overflow-hidden rounded-xl sm:rounded-2xl relative">
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     transition={{ duration: 0.4 }}
+                    className="w-full"
                   >
                     <img 
                       src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&h=600&fit=crop"
                       alt="Students Learning"
-                      className="rounded-2xl w-full h-auto transform group-hover:scale-110 transition-transform duration-700 ease-out cursor-pointer"
+                      className="rounded-xl sm:rounded-2xl w-full h-auto transform group-hover:scale-110 transition-transform duration-700 ease-out cursor-pointer object-cover"
                     />
                   </motion.div>
                   
@@ -360,7 +361,7 @@ const Landing = () => {
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ delay: 1, type: "spring", stiffness: 200 }}
-                    className="absolute top-4 right-4 bg-gradient-to-r from-emerald-500 to-lime-500 text-white px-4 py-2 rounded-full text-xs font-bold shadow-lg bounce-slow"
+                    className="absolute top-2 sm:top-4 right-2 sm:right-4 bg-gradient-to-r from-emerald-500 to-lime-500 text-white px-2 sm:px-4 py-1 sm:py-2 rounded-full text-xs font-bold shadow-lg bounce-slow"
                   >
                     ✨ PREMIUM
                   </motion.div>
@@ -372,14 +373,14 @@ const Landing = () => {
       </section>
 
       {/* About Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="text-center mb-12">
+      <section className="py-12 sm:py-16 lg:py-20 bg-white dark:bg-slate-900 transition-colors duration-300">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-8 sm:mb-12">
             <motion.span 
               initial={{ scale: 0, opacity: 0 }}
               whileInView={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5, type: "spring" }}
-              className="inline-block px-4 py-2 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold mb-4 scale-pulse"
+              className="inline-block px-4 py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full text-xs sm:text-sm font-bold mb-3 sm:mb-4 scale-pulse"
             >
               ABOUT SYSTEM
             </motion.span>
@@ -387,7 +388,7 @@ const Landing = () => {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="text-4xl font-bold text-slate-900 mb-4"
+              className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 dark:text-slate-100 mb-3 sm:mb-4"
             >
               Centralized Proctored Assessment Platform
             </motion.h2>
@@ -395,7 +396,7 @@ const Landing = () => {
               initial={{ opacity: 0 }}
               whileInView={{ opacity: 1 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg text-slate-600 max-w-3xl mx-auto"
+              className="text-base sm:text-lg text-slate-600 dark:text-slate-400 max-w-3xl mx-auto px-4"
             >
               Proctolearn is a transparent, accountable platform that connects students with educators to conduct secure AI-proctored quizzes efficiently.
             </motion.p>
@@ -428,9 +429,9 @@ const Landing = () => {
       </section>
 
       {/* Features Cards Section */}
-      <section id="features" className="py-20 bg-gradient-to-b from-white to-emerald-50/50" data-animate>
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <section id="features" className="py-12 sm:py-16 lg:py-20 bg-gradient-to-b from-white dark:from-slate-900 to-emerald-50/50 dark:to-slate-800/50 transition-colors duration-300" data-animate>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {/* Feature 1 - AI Proctoring */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
@@ -439,16 +440,16 @@ const Landing = () => {
               whileHover={{ y: -8 }}
               className="group"
             >
-              <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
+              <div className="relative bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
                 <motion.div 
                   className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6"
                   whileHover={{ rotate: 360, scale: 1.1 }}
                   transition={{ duration: 0.6 }}
                 >
-                  <Eye className="w-8 h-8" />
+                  <Eye className="w-6 h-6 sm:w-8 sm:h-8" />
                 </motion.div>
-                <h3 className="text-2xl font-bold mb-4">AI Proctoring</h3>
-                <p className="text-emerald-50 leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">AI Proctoring</h3>
+                <p className="text-emerald-50 text-sm sm:text-base leading-relaxed">
                   Advanced AI monitors student activity with 98% accuracy. Real-time alerts for suspicious behavior, gaze tracking, and audio monitoring.
                 </p>
                 {/* Animated Corner Accent */}
@@ -468,16 +469,16 @@ const Landing = () => {
               whileHover={{ y: -8 }}
               className="group"
             >
-              <div className="relative bg-gradient-to-br from-green-500 to-green-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
+              <div className="relative bg-gradient-to-br from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
                 <motion.div 
                   className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6"
                   whileHover={{ rotate: 360, scale: 1.1 }}
                   transition={{ duration: 0.6 }}
                 >
-                  <FileText className="w-8 h-8" />
+                  <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
                 </motion.div>
-                <h3 className="text-2xl font-bold mb-4">Create & Manage</h3>
-                <p className="text-green-50 leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Create & Manage</h3>
+                <p className="text-green-50 text-sm sm:text-base leading-relaxed">
                   Faculty can create quizzes with ease. Add questions, set time limits, configure proctoring settings, and track student performance in real-time.
                 </p>
                 {/* Animated Corner Accent */}
@@ -497,16 +498,16 @@ const Landing = () => {
               whileHover={{ y: -8 }}
               className="group"
             >
-              <div className="relative bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
+              <div className="relative bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-white shadow-xl hover:shadow-2xl transition-all duration-500 cursor-pointer h-full overflow-hidden">
                 <motion.div 
                   className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mb-6"
                   whileHover={{ rotate: 360, scale: 1.1 }}
                   transition={{ duration: 0.6 }}
                 >
-                  <BarChart3 className="w-8 h-8" />
+                  <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8" />
                 </motion.div>
-                <h3 className="text-2xl font-bold mb-4">Detailed Analytics</h3>
-                <p className="text-orange-50 leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-bold mb-3 sm:mb-4">Detailed Analytics</h3>
+                <p className="text-orange-50 text-sm sm:text-base leading-relaxed">
                   Comprehensive reports and public dashboards. Track performance metrics, flag reviews, and generate detailed analytics for stakeholders.
                 </p>
                 {/* Animated Corner Accent */}
@@ -781,7 +782,7 @@ const Landing = () => {
             <div className="lg:col-span-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-gradient-to-r from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                  PL
+                  <GraduationCap className="w-7 h-7" />
                 </div>
                 <span className="text-xl font-bold bg-gradient-to-r from-emerald-400 to-lime-400 bg-clip-text text-transparent">
                   Proctolearn
