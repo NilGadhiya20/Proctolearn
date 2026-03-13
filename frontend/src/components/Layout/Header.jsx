@@ -62,6 +62,7 @@ const Header = ({ onMenuToggle }) => {
       admin: [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
         { icon: Users, label: 'Manage Users', path: '/manage-users' },
+        { icon: Users, label: 'View Students', path: '/students' },
         { icon: FileText, label: 'Create Quiz', path: '/create-quiz' },
         { icon: BarChart3, label: 'View Reports', path: '/view-reports' },
         { icon: Eye, label: 'Monitor Sessions', path: '/monitor-sessions' },
@@ -256,7 +257,7 @@ const Header = ({ onMenuToggle }) => {
                   }}
                   startIcon={<Icon size={18} />}
                   sx={{
-                    color: active ? '#16a34a' : '#64748b',
+                    color: active ? '#16a34a' : '#000000',
                     textTransform: 'none',
                     fontWeight: active ? '700' : '600',
                     fontSize: { lg: '0.85rem', xl: '0.9rem' },
@@ -398,7 +399,7 @@ const Header = ({ onMenuToggle }) => {
               >
                 <Typography variant="body2" sx={{ 
                   fontWeight: '700', 
-                  color: '#1e293b',
+                  color: '#000000',
                   display: { xs: 'none', md: 'block' },
                   fontSize: { md: '0.8rem', lg: '0.85rem' }
                 }}>

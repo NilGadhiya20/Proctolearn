@@ -12,7 +12,7 @@ export const globalErrorHandler = (err, req, res, next) => {
 
   // Wrong MongoDB ID
   if (err.name === 'CastError') {
-    const message = `Resource not found. Invalid: ${err.path}`;
+    const message = `Invalid ${err.path || 'ID'}. Please check the value and try again.`;
     err = new AppError(message, 400);
   }
 

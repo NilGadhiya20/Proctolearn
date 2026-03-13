@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -17,7 +17,8 @@ import {
   User,
   Settings,
   LogOut,
-  UserCheck
+  UserCheck,
+  Play
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -33,6 +34,7 @@ import { Bar, Doughnut } from 'react-chartjs-2';
 import { useAuthStore } from '../context/store';
 import DashboardSidebar from '../components/Layout/DashboardSidebar';
 import { getMyQuizzes } from '../services/myQuizService';
+import { getAllQuizzes } from '../services/quizService';
 import '../styles/dashboards.css';
 import '../styles/dark-mode.css';
 
@@ -62,6 +64,7 @@ const StudentDashboard = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [stats, setStats] = useState({
     completedQuizzes: 0,
     totalAttempts: 0,
@@ -80,53 +83,95 @@ const StudentDashboard = () => {
     { icon: Settings, label: 'Settings', id: 'settings' }
   ];
 
-  // Chart data for performance tracking
-  const performanceData = {
-    labels: ['Math', 'Science', 'History', 'English', 'Geography'],
-    datasets: [{
-      label: 'Quiz Scores (%)',
-      data: [85, 92, 78, 88, 90],
-      backgroundColor: [
-        'rgba(34, 197, 94, 0.8)',
-        'rgba(59, 130, 246, 0.8)',
-        'rgba(168, 85, 247, 0.8)',
-        'rgba(249, 115, 22, 0.8)',
-        'rgba(236, 72, 153, 0.8)',
-      ],
-      borderColor: [
-        'rgba(34, 197, 94, 1)',
-        'rgba(59, 130, 246, 1)',
-        'rgba(168, 85, 247, 1)',
-        'rgba(249, 115, 22, 1)',
-        'rgba(236, 72, 153, 1)',
-      ],
-      borderWidth: 2,
-      borderRadius: 8,
-    }]
+  const getSubmissionPercent = (submission) => {
+    if (typeof submission?.percentage === 'number') return Math.round(submission.percentage);
+    const score = submission?.score ?? submission?.totalMarksObtained;
+    const total = submission?.totalMarks;
+    if (typeof score === 'number' && typeof total === 'number' && total > 0) {
+      return Math.round((score / total) * 100);
+    }
+    return null;
   };
 
-  // Chart for quiz completion status
-  const completionData = {
-    labels: ['Completed', 'In Progress', 'Not Started'],
-    datasets: [{
-      data: [stats.completedQuizzes || 8, 3, 5],
-      backgroundColor: [
-        'rgba(34, 197, 94, 0.8)',
-        'rgba(251, 146, 60, 0.8)',
-        'rgba(156, 163, 175, 0.8)',
-      ],
-      borderColor: [
-        'rgba(34, 197, 94, 1)',
-        'rgba(251, 146, 60, 1)',
-        'rgba(156, 163, 175, 1)',
-      ],
-      borderWidth: 2,
-    }]
-  };
+  // Real data chart: average score by subject
+  const performanceData = useMemo(() => {
+    const buckets = {};
+
+    (myQuizzes || []).forEach((submission) => {
+      const subject = submission?.quiz?.subject || 'General';
+      const percent = getSubmissionPercent(submission);
+      if (percent === null) return;
+
+      if (!buckets[subject]) buckets[subject] = [];
+      buckets[subject].push(percent);
+    });
+
+    const labels = Object.keys(buckets);
+    const values = labels.map((subject) => {
+      const arr = buckets[subject];
+      return Math.round(arr.reduce((sum, v) => sum + v, 0) / arr.length);
+    });
+
+    const palette = [
+      'rgba(16, 185, 129, 0.85)',
+      'rgba(59, 130, 246, 0.85)',
+      'rgba(139, 92, 246, 0.85)',
+      'rgba(249, 115, 22, 0.85)',
+      'rgba(236, 72, 153, 0.85)',
+      'rgba(14, 165, 233, 0.85)'
+    ];
+
+    const fallback = labels.length === 0;
+    const finalLabels = fallback ? ['No Attempts Yet'] : labels;
+    const finalValues = fallback ? [0] : values;
+
+    return {
+      labels: finalLabels,
+      datasets: [{
+        label: 'Average Score (%)',
+        data: finalValues,
+        backgroundColor: finalLabels.map((_, i) => palette[i % palette.length]),
+        borderColor: finalLabels.map((_, i) => palette[i % palette.length].replace('0.85', '1')),
+        borderWidth: 2,
+        borderRadius: 12,
+        maxBarThickness: 56,
+      }]
+    };
+  }, [myQuizzes]);
+
+  // Real data chart: completion overview
+  const completionData = useMemo(() => {
+    const completed = (myQuizzes || []).filter((s) => ['submitted', 'graded'].includes(s.status)).length;
+    const inProgress = (myQuizzes || []).filter((s) => s.status === 'in_progress').length;
+    const attemptedQuizIds = new Set((myQuizzes || []).map((s) => s.quiz?._id).filter(Boolean));
+    const notStarted = Math.max((quizzes || []).length - attemptedQuizIds.size, 0);
+
+    return {
+      labels: ['Completed', 'In Progress', 'Not Started'],
+      datasets: [{
+        data: [completed, inProgress, notStarted],
+        backgroundColor: [
+          'rgba(34, 197, 94, 0.85)',
+          'rgba(251, 146, 60, 0.85)',
+          'rgba(156, 163, 175, 0.85)',
+        ],
+        borderColor: [
+          'rgba(34, 197, 94, 1)',
+          'rgba(251, 146, 60, 1)',
+          'rgba(156, 163, 175, 1)',
+        ],
+        borderWidth: 2,
+      }]
+    };
+  }, [myQuizzes, quizzes]);
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 900,
+      easing: 'easeOutQuart'
+    },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -139,6 +184,7 @@ const StudentDashboard = () => {
     scales: {
       y: {
         beginAtZero: true,
+        suggestedMax: 100,
         grid: { color: 'rgba(0, 0, 0, 0.1)' },
         ticks: { color: 'rgba(0, 0, 0, 0.6)' }
       },
@@ -152,6 +198,10 @@ const StudentDashboard = () => {
   const doughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: {
+      duration: 1000,
+      easing: 'easeOutQuart'
+    },
     plugins: {
       legend: {
         position: 'right',
@@ -178,53 +228,98 @@ const StudentDashboard = () => {
     setSidebarOpen(false);
   };
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (initialLoad = false) => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_BASE_URL}/quiz`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-          console.error('Quiz fetch failed:', res.status);
-          setQuizzes([]);
-          setLoading(false);
-          return;
+        if (initialLoad) {
+          setLoading(true);
+          setMyQuizzesLoading(true);
         }
-        const data = await res.json();
-        setQuizzes(data.data?.slice(0, 4) || []);
-        // Simulate stats fetch
-        setStats({
-          completedQuizzes: 3,
-          totalAttempts: 7,
-          averageScore: 82,
-          upcoming: 2
-        });
+
+        const [quizResponse, submissionResponse] = await Promise.all([
+          getAllQuizzes({ status: 'published' }),
+          getMyQuizzes()
+        ]);
+
+        // Fetch published quizzes
+        if (quizResponse?.success) {
+          const allQuizzes = quizResponse.data || [];
+          console.log('✅ Quizzes fetched:', allQuizzes.length, allQuizzes);
+          
+          // Filter for available quizzes (published and within access window if set)
+          const availableQuizzes = allQuizzes.filter(quiz => {
+            if (quiz.status !== 'published') return false;
+            
+            // Debug: Log quiz structure
+            if (!quiz._id) {
+              console.error('❌ CRITICAL: Quiz missing _id! Quiz object:', quiz);
+              console.error('   Quiz keys:', Object.keys(quiz));
+              return false;  // Filter out quizzes without _id
+            }
+            
+            // Check access window if it exists
+            if (quiz.accessWindow) {
+              const now = new Date();
+              if (quiz.accessWindow.startDate && new Date(quiz.accessWindow.startDate) > now) {
+                console.log(`Quiz ${quiz.title} not started yet`);
+                return false; // Quiz hasn't started yet
+              }
+              if (quiz.accessWindow.endDate && new Date(quiz.accessWindow.endDate) < now) {
+                console.log(`Quiz ${quiz.title} has ended`);
+                return false; // Quiz has ended
+              }
+            }
+            
+            return true;
+          });
+          
+          console.log('✅ Available quizzes:', availableQuizzes.length, availableQuizzes);
+          setQuizzes(availableQuizzes || []);
+
+          const submissions = submissionResponse?.success ? (submissionResponse.data || []) : [];
+          setMyQuizzes(submissions);
+
+          const completedQuizzes = submissions.filter((s) => ['submitted', 'graded'].includes(s.status)).length;
+          const scored = submissions
+            .map((s) => getSubmissionPercent(s))
+            .filter((v) => typeof v === 'number');
+          const averageScore = scored.length > 0
+            ? Math.round(scored.reduce((sum, v) => sum + v, 0) / scored.length)
+            : 0;
+          const upcoming = availableQuizzes.filter((quiz) => {
+            const startDate = quiz?.accessWindow?.startDate;
+            return startDate ? new Date(startDate) > new Date() : false;
+          }).length;
+
+          setStats({
+            completedQuizzes,
+            totalAttempts: submissions.length,
+            averageScore,
+            upcoming
+          });
+        } else {
+          console.warn('Failed to fetch quizzes:', quizResponse?.message);
+          setQuizzes([]);
+        }
+
+        setLastUpdated(new Date());
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
+        console.error('❌ Error fetching dashboard data:', err);
         setQuizzes([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchData();
-    // Fetch student's attempted quizzes
-    const fetchMyQuizzes = async () => {
-      try {
-        setMyQuizzesLoading(true);
-        const res = await getMyQuizzes();
-        if (res?.success) setMyQuizzes(res.data || []);
-        else setMyQuizzes([]);
-      } catch (err) {
-        console.error('Error fetching my quizzes:', err);
         setMyQuizzes([]);
       } finally {
-        setMyQuizzesLoading(false);
+        if (initialLoad) {
+          setLoading(false);
+          setMyQuizzesLoading(false);
+        }
       }
     };
-    if (user) fetchMyQuizzes();
+
+    if (user) {
+      fetchData(true);
+      const interval = setInterval(() => fetchData(false), 20000);
+      return () => clearInterval(interval);
+    }
   }, [user]);
 
   return (
@@ -291,10 +386,10 @@ const StudentDashboard = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
               {[
-                { title: 'Completed', value: stats.completedQuizzes || 8, icon: CheckCircle, color: 'green', change: '+15%' },
-                { title: 'Total Attempts', value: stats.totalAttempts || 12, icon: Target, color: 'blue', change: '+8%' },
-                { title: 'Avg. Score', value: `${stats.averageScore || 85}%`, icon: Award, color: 'purple', change: '+12%' },
-                { title: 'Upcoming', value: stats.upcoming || 4, icon: Calendar, color: 'orange', change: '+6%' }
+                { title: 'Completed', value: stats.completedQuizzes ?? 0, icon: CheckCircle, color: 'green', change: '+Live' },
+                { title: 'Total Attempts', value: stats.totalAttempts ?? 0, icon: Target, color: 'blue', change: '+Live' },
+                { title: 'Avg. Score', value: `${stats.averageScore ?? 0}%`, icon: Award, color: 'purple', change: '+Live' },
+                { title: 'Upcoming', value: stats.upcoming ?? 0, icon: Calendar, color: 'orange', change: '+Live' }
               ].map((stat, idx) => (
                 <motion.div
                   key={stat.title}
@@ -347,7 +442,7 @@ const StudentDashboard = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-lg lg:text-xl font-bold text-slate-800 mb-1">Subject Performance</h3>
-                    <p className="text-sm text-slate-600">Your scores across subjects</p>
+                    <p className="text-sm text-slate-600">Live scores across subjects {lastUpdated ? `· updated ${lastUpdated.toLocaleTimeString()}` : ''}</p>
                   </div>
                 </div>
                 <div className="h-64 lg:h-80">
@@ -365,7 +460,7 @@ const StudentDashboard = () => {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h3 className="text-lg lg:text-xl font-bold text-slate-800 mb-1">Quiz Status</h3>
-                    <p className="text-sm text-slate-600">Completion overview</p>
+                    <p className="text-sm text-slate-600">Real-time completion overview</p>
                   </div>
                 </div>
                 <div className="h-64 lg:h-80">
@@ -399,33 +494,103 @@ const StudentDashboard = () => {
                   <div className="inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : quizzes.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No quizzes available.</div>
+                <div className="text-center py-12 bg-white/90 backdrop-blur-sm rounded-xl border border-slate-200/50 p-8">
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <BookOpen className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <p className="text-slate-700 font-medium mb-2">No quizzes available at the moment</p>
+                  <p className="text-sm text-slate-500">Check back later or contact your faculty</p>
+                </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                  {quizzes.slice(0, 4).map((quiz) => (
-                    <div
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
+                  {quizzes.map((quiz, idx) => (
+                    <motion.div
                       key={quiz._id}
-                      className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border border-slate-200/50"
-                      onClick={() => navigate(`/quiz/${quiz._id}`)}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-5 lg:p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-xl border border-slate-200/50 group h-full flex flex-col"
+                      onClick={() => {
+                        console.log('🎯 Quiz card clicked. Quiz object:', quiz);
+                        console.log('   - quiz._id:', quiz._id);
+                        console.log('   - quiz.id:', quiz.id);
+                        console.log('   - quiz title:', quiz.title);
+                        console.log('   - Navigating to /quiz/' + quiz._id);
+                        navigate(`/quiz/${quiz._id}`);
+                      }}
                     >
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-emerald-100 rounded-lg">
-                          <BookOpen className="w-5 h-5 text-emerald-600" />
-                        </div>
-                        <h3 className="font-bold text-slate-800">{quiz.title}</h3>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" /> {quiz.duration} min
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Zap className="w-4 h-4" /> {quiz.questions?.length || 0} Questions
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <AlertCircle className="w-4 h-4" /> {quiz.status}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2 flex-1">
+                          <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors flex-shrink-0">
+                            <BookOpen className="w-5 h-5 text-emerald-600" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="font-bold text-slate-800 group-hover:text-emerald-600 transition-colors line-clamp-2 text-sm lg:text-base">
+                              {quiz.title}
+                            </h3>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                      
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700 mb-3 w-fit">
+                        ✓ Available Now
+                      </span>
+                      
+                      {quiz.description && (
+                        <p className="text-xs lg:text-sm text-slate-600 mb-3 line-clamp-2 flex-grow">
+                          {quiz.description}
+                        </p>
+                      )}
+                      
+                      <div className="flex flex-wrap gap-2 text-xs text-slate-600 mb-3 pb-3 border-b border-slate-200">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 lg:w-4 lg:h-4 text-slate-500" /> 
+                          <span className="font-semibold">{quiz.duration}m</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Award className="w-3 h-3 lg:w-4 lg:h-4 text-slate-500" /> 
+                          <span className="font-semibold">{quiz.totalMarks || 0}</span>
+                        </div>
+                      </div>
+                      
+                      {(quiz.subject || quiz.chapter) && (
+                        <div className="flex flex-wrap gap-1 text-xs mb-3">
+                          {quiz.subject && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                              {quiz.subject}
+                            </span>
+                          )}
+                          {quiz.chapter && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
+                              {quiz.chapter}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      
+                      <button
+                        className="mt-auto w-full py-2 px-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold hover:from-green-600 hover:to-emerald-700 transition-all duration-300 text-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          console.log('▶️ START button clicked. Quiz object:', quiz);
+                          console.log('   - quiz._id:', quiz._id);
+                          console.log('   - quiz.id:', quiz.id);
+                          console.log('   - All quiz keys:', Object.keys(quiz));
+                          
+                          if (!quiz._id && !quiz.id) {
+                            console.error('❌ ERROR: Quiz has no _id or id field!');
+                            toast.error('Quiz ID is missing. Cannot start quiz.');
+                            return;
+                          }
+                          
+                          const quizId = quiz._id || quiz.id;
+                          navigate(`/quiz/${quizId}`);
+                        }}
+                      >
+                        <Play size={16} className="inline mr-1" />
+                        Start
+                      </button>
+                    </motion.div>
                   ))}
                 </div>
               )}

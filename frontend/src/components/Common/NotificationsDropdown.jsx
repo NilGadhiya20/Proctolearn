@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import socket from '../../socket';
 import { useAuthStore } from '../../context/store';
+import { getAllQuizzes } from '../../services/quizService';
 import { formatDistanceToNow } from 'date-fns';
 
 const NotificationsDropdown = () => {
@@ -32,6 +33,17 @@ const NotificationsDropdown = () => {
   const dropdownRef = useRef(null);
   const { user } = useAuthStore();
   const audioContextRef = useRef(null);
+  const recentNotificationKeysRef = useRef(new Map());
+
+  const formatLabel = (value) => {
+    if (!value) return 'Activity';
+    return String(value)
+      .replace(/_/g, ' ')
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
 
   // Initialize Audio Context
   useEffect(() => {
@@ -150,19 +162,49 @@ const NotificationsDropdown = () => {
   useEffect(() => {
     if (!user) return;
 
+    let isMounted = true;
+
+    const joinFacultyQuizRooms = async () => {
+      if (user.role !== 'faculty' && user.role !== 'admin') return;
+      try {
+        const response = await getAllQuizzes();
+        const quizzes = response?.data || [];
+        if (!isMounted) return;
+
+        quizzes.forEach((quiz) => {
+          if (quiz?._id) {
+            socket.emit('joinQuiz', { quizId: quiz._id, role: user.role });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to join quiz rooms for notifications:', error);
+      }
+    };
+
     // Join appropriate rooms based on role
     if (user.role === 'admin') {
       socket.emit('join-dashboard', { institutionId: user.institution });
     }
+    joinFacultyQuizRooms();
 
     // Listen for quiz activities
     socket.on('activity-logged', (data) => {
       if (user.role === 'faculty' || user.role === 'admin') {
+        // Violation-type events are sent as dedicated alerts; skip to avoid duplicate notifications.
+        const violationActivities = ['fullscreen_exit', 'tab_change', 'page_visibility_change', 'window_blur'];
+        if (violationActivities.includes(data.activityType)) {
+          return;
+        }
+
+        const studentLabel = data.studentName
+          ? `${data.studentName}${data.studentEmail ? ` (${data.studentEmail})` : ''}`
+          : (data.studentId || 'unknown student');
+
         addNotification({
           type: 'activity',
           severity: data.severity,
           title: `Student Activity Detected`,
-          message: `${data.activityType} detected for submission ${data.submissionId}`,
+          message: `${formatLabel(data.activityType)} detected: ${studentLabel}`,
           timestamp: new Date(data.timestamp),
           data: data
         });
@@ -172,11 +214,15 @@ const NotificationsDropdown = () => {
     // Listen for alerts
     socket.on('alert', (data) => {
       if (user.role === 'faculty' || user.role === 'admin') {
+        const studentLabel = data.studentName
+          ? `${data.studentName}${data.studentEmail ? ` (${data.studentEmail})` : ''}`
+          : (data.studentId || 'unknown student');
+
         addNotification({
           type: 'violation',
           severity: data.severity,
-          title: `⚠️ ${data.alertType}`,
-          message: `Alert for student ${data.studentId}: ${data.activity || 'Suspicious activity detected'}`,
+          title: `⚠️ ${formatLabel(data.alertType)}`,
+          message: `Alert for ${studentLabel}: ${data.message || formatLabel(data.activity) || 'Suspicious activity detected'}`,
           timestamp: new Date(),
           data: data
         });
@@ -213,6 +259,7 @@ const NotificationsDropdown = () => {
 
     // Cleanup
     return () => {
+      isMounted = false;
       socket.off('activity-logged');
       socket.off('alert');
       socket.off('submission-complete');
@@ -222,6 +269,33 @@ const NotificationsDropdown = () => {
 
   // Add new notification
   const addNotification = (notification) => {
+    const dedupKeyParts = [
+      notification.type,
+      notification.title,
+      notification.message,
+      notification.data?.submissionId || '',
+      notification.data?.studentId || ''
+    ];
+    const dedupKey = dedupKeyParts.join('|');
+    const now = Date.now();
+    const existingAt = recentNotificationKeysRef.current.get(dedupKey);
+
+    if (existingAt && now - existingAt < 4000) {
+      return;
+    }
+
+    recentNotificationKeysRef.current.set(dedupKey, now);
+
+    // Keep dedup map compact.
+    if (recentNotificationKeysRef.current.size > 200) {
+      const cutoff = now - 60000;
+      for (const [key, ts] of recentNotificationKeysRef.current.entries()) {
+        if (ts < cutoff) {
+          recentNotificationKeysRef.current.delete(key);
+        }
+      }
+    }
+
     const newNotification = {
       id: Date.now() + Math.random(),
       read: false,

@@ -4,6 +4,7 @@ import { ExpandMore as ExpandMoreIcon, Alert as AlertIcon } from '@mui/icons-mat
 import toast from 'react-hot-toast';
 import apiClient from '../services/api';
 import useRealtimeAttempts from '../hooks/useRealtimeAttempts';
+import AnimatedLoader from '../components/Common/AnimatedLoader';
 
 export default function FacultyMonitoring() {
   const [quizzes, setQuizzes] = useState([]);
@@ -78,7 +79,11 @@ export default function FacultyMonitoring() {
   // Get anomalous submissions (from hook alerts or suspicious flag)
   const anomalousSubmissions = submissions.filter(s => s.suspiciousActivityDetected || s.riskLevel !== 'normal');
 
-  if (loading) return <Box sx={{ p: 3 }}><Typography>Loading...</Typography></Box>;
+  if (loading) return (
+    <Box sx={{ p: 3, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <AnimatedLoader message="Loading faculty monitoring" size="large" />
+    </Box>
+  );
 
   return (
     <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>

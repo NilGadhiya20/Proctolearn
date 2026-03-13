@@ -29,40 +29,40 @@ const AuthNavbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center py-4">
           {/* Logo - Left */}
-          <Link to="/" className="flex items-center gap-3 flex-shrink-0">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 hover:scale-110 transition-all duration-300 cursor-pointer">
+          <Link to="/" className="flex items-center gap-3 flex-shrink-0 group">
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 hover:shadow-[0_10px_25px_rgba(5,150,105,0.3)] group-hover:scale-110 transition-all duration-300 cursor-pointer">
               <span className="text-white font-bold text-xl">PL</span>
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight cursor-pointer">
+            <span className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight cursor-pointer group-hover:drop-shadow-md transition-all duration-300">
               Proctolearn
             </span>
           </Link>
 
           {/* Desktop Nav Links - Center */}
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6 xl:gap-8 mx-1 sm:mx-2 md:mx-4 lg:mx-10">
-            <Link to="/" className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="Home">
+            <Link to="/" className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="Home">
               <Home className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-xs sm:text-sm md:text-base">Home</span>
             </Link>
             {isAuthenticated && user?.role === 'student' && (
-              <Link to="/available-quizzes" className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="Quizzes">
+              <Link to="/available-quizzes" className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="Quizzes">
                 <BookOpen className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="text-xs sm:text-sm md:text-base">Quizzes</span>
               </Link>
             )}
-            <button onClick={() => scrollToSection('features')} className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="Features">
+            <button onClick={() => scrollToSection('features')} className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="Features">
               <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="text-xs sm:text-sm md:text-base">Features</span>
             </button>
-            <button onClick={() => scrollToSection('how-it-works')} className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="How it Works">
+            <button onClick={() => scrollToSection('how-it-works')} className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="How it Works">
               <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden lg:inline text-sm xl:text-base">How it Works</span>
             </button>
-            <Link to="/pricing" className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="Pricing">
+            <Link to="/pricing" className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="Pricing">
               <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden lg:inline text-sm xl:text-base">Pricing</span>
             </Link>
-            <Link to="/support" className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-emerald-800 font-bold py-2 px-2 hover:scale-110 transition-all duration-300" title="Help">
+            <Link to="/support" className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-800 font-bold py-2 px-2 rounded-lg hover:bg-emerald-50/50 transition-all duration-300" title="Help">
               <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
               <span className="hidden lg:inline text-sm xl:text-base">Help</span>
             </Link>
@@ -73,7 +73,7 @@ const AuthNavbar = () => {
             {!isLoginPage && (
               <Link
                 to="/login"
-                className="nav-link flex items-center gap-1.5 text-emerald-700 hover:text-white font-bold px-2 sm:px-3 lg:px-6 py-2 lg:py-3 rounded-xl hover:bg-gradient-to-r hover:from-emerald-500 hover:to-lime-500 hover:shadow-lg hover:scale-110 transition-all duration-300 border-2 border-transparent hover:border-emerald-400"
+                className="nav-link flex items-center gap-1.5 text-black hover:text-emerald-700 font-bold px-2 sm:px-3 lg:px-6 py-2 lg:py-3 rounded-xl hover:bg-emerald-50 hover:shadow-[0_8px_20px_rgba(5,150,105,0.15)] transition-all duration-300 border-2 border-emerald-300 hover:border-emerald-500"
                 title="Login"
               >
                 <LogIn className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -83,7 +83,7 @@ const AuthNavbar = () => {
             {!isRegisterPage && (
               <Link
                 to="/register"
-                className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold px-2 sm:px-3 md:px-4 lg:px-8 py-2 lg:py-3 rounded-2xl shadow-xl hover:shadow-2xl hover:shadow-emerald-500/50 hover:-translate-y-1 hover:scale-110 hover:from-emerald-600 hover:to-lime-600 transition-all duration-400 transform-gpu active:scale-95"
+                className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold px-2 sm:px-3 md:px-4 lg:px-8 py-2 lg:py-3 rounded-2xl shadow-lg shadow-emerald-500/30 hover:shadow-[0_15px_40px_rgba(5,150,105,0.35)] hover:from-emerald-600 hover:to-lime-600 transition-all duration-300 transform-gpu hover:scale-[1.02] active:scale-95"
                 title="Sign Up"
               >
                 <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />

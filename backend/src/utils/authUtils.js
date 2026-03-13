@@ -1,11 +1,22 @@
 import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { HTTP_STATUS } from '../config/constants.js';
+
+// Ensure environment variables are loaded
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath });
 
 // Get secrets with fallback defaults
 const getJWTSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     console.error('❌ JWT_SECRET not found in environment variables!');
+    console.error('   Checked path:', envPath);
+    console.error('   Available JWT keys:', Object.keys(process.env).filter(k => k.includes('JWT')));
     throw new Error('JWT_SECRET environment variable is not set');
   }
   return secret;

@@ -56,6 +56,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
   const defaultItems = [
     { icon: LayoutDashboard, label: 'Overview', id: 'overview', path: '/admin/dashboard' },
     { icon: Users, label: 'Manage Users', id: 'manage-users', path: '/manage-users' },
+    { icon: Users, label: 'View Students', id: 'students', path: '/students' },
     { icon: FileText, label: 'Create Quiz', id: 'create-quiz', path: '/create-quiz' },
     { icon: BarChart3, label: 'View Reports', id: 'view-reports', path: '/view-reports' },
     { icon: Eye, label: 'Monitor Sessions', id: 'monitor-sessions', path: '/monitor-sessions' },
@@ -187,8 +188,8 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
                 <GraduationCap size={20} />
               </div>
               <div>
-                <h1 className="font-bold text-slate-800 text-lg">Proctolearn</h1>
-                <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">
+                <h1 className="font-bold text-black text-lg">Proctolearn</h1>
+                <span className="text-xs font-bold text-black uppercase tracking-wider">
                   {user?.role || 'Dashboard'}
                 </span>
               </div>
@@ -197,7 +198,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
             {isMobile && (
               <motion.button 
                 onClick={onClose} 
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 text-black hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
               >
@@ -235,7 +236,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
                     className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-medium transition-all duration-200 group ${
                       isActive
                         ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm'
+                        : 'text-black hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm'
                     }`}
                   >
                     <Icon size={20} className={`group-hover:scale-110 transition-transform duration-200 ${
@@ -274,7 +275,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
                       `flex items-center gap-3 px-4 py-3.5 rounded-xl font-medium transition-all duration-200 group ${
                         isRouteActive
                           ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100'
-                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm'
+                          : 'text-black hover:bg-slate-50 hover:text-slate-900 hover:shadow-sm'
                       }`
                     }
                   >
@@ -317,7 +318,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">
+                  <p className="text-sm font-semibold text-black truncate">
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p className="text-xs text-slate-500 truncate">

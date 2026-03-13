@@ -30,23 +30,81 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PeopleIcon from '@mui/icons-material/People';
 import QuizIcon from '@mui/icons-material/Quiz';
 import toast from 'react-hot-toast';
+import { getAllQuizzes, getQuizSubmissions } from '../services/quizService';
 
 const ViewReports = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-  const [reports, setReports] = useState([
-    { id: 1, quiz: 'Mathematics Quiz 1', participants: 45, avgScore: 78, completed: 42, date: '2025-12-25' },
-    { id: 2, quiz: 'Science Quiz 2', participants: 38, avgScore: 82, completed: 35, date: '2025-12-20' },
-    { id: 3, quiz: 'History Quiz 1', participants: 50, avgScore: 65, completed: 48, date: '2025-12-15' }
-  ]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadReports = async () => {
+      try {
+        setLoading(true);
+        const quizResponse = await getAllQuizzes();
+        const quizzes = quizResponse?.data || [];
+
+        const reportRows = await Promise.all(
+          quizzes.map(async (quiz) => {
+            try {
+              const subRes = await getQuizSubmissions(quiz._id);
+              const submissions = subRes?.data || [];
+              const participants = submissions.length;
+              const completedSubs = submissions.filter((s) => s.status !== 'in_progress');
+              const completed = completedSubs.length;
+              const avgScore = completed > 0
+                ? Math.round(completedSubs.reduce((sum, s) => sum + (Number(s.percentage) || 0), 0) / completed)
+                : 0;
+
+              return {
+                id: quiz._id,
+                quiz: quiz.title,
+                participants,
+                avgScore,
+                completed,
+                date: quiz.createdAt || new Date().toISOString()
+              };
+            } catch {
+              return {
+                id: quiz._id,
+                quiz: quiz.title,
+                participants: 0,
+                avgScore: 0,
+                completed: 0,
+                date: quiz.createdAt || new Date().toISOString()
+              };
+            }
+          })
+        );
+
+        setReports(reportRows);
+      } catch (error) {
+        toast.error('Failed to load reports');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadReports();
+  }, []);
+
+  const totalQuizzes = reports.length;
+  const totalParticipants = reports.reduce((sum, r) => sum + r.participants, 0);
+  const avgScoreAll = totalQuizzes > 0
+    ? Math.round(reports.reduce((sum, r) => sum + r.avgScore, 0) / totalQuizzes)
+    : 0;
+  const completionRateAll = totalParticipants > 0
+    ? Math.round((reports.reduce((sum, r) => sum + r.completed, 0) / totalParticipants) * 100)
+    : 0;
 
   const stats = [
-    { title: 'Total Quizzes', value: '12', icon: <QuizIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-    { title: 'Total Participants', value: '133', icon: <PeopleIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
-    { title: 'Avg Score', value: '75%', icon: <TrendingUpIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
-    { title: 'Completion Rate', value: '94%', icon: <AssessmentIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
+    { title: 'Total Quizzes', value: String(totalQuizzes), icon: <QuizIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+    { title: 'Total Participants', value: String(totalParticipants), icon: <PeopleIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
+    { title: 'Avg Score', value: `${avgScoreAll}%`, icon: <TrendingUpIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
+    { title: 'Completion Rate', value: `${completionRateAll}%`, icon: <AssessmentIcon sx={{ fontSize: 40 }} />, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }
   ];
 
   // Helper: create a downloadable file from a Blob
@@ -220,6 +278,13 @@ const ViewReports = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
+                      {loading && (
+                        <TableRow>
+                          <TableCell colSpan={7}>
+                            <Typography color="text.secondary">Loading real report data...</Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
                       {reports.map((report) => {
                         const completionRate = Math.round((report.completed / report.participants) * 100);
                         return (

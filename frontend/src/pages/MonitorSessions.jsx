@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Container,
   Box,
@@ -15,6 +15,7 @@ import {
   ListItemText,
   ListItemAvatar,
   Divider,
+  Alert,
   useTheme,
   useMediaQuery
 } from '@mui/material';
@@ -27,25 +28,103 @@ import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import PersonIcon from '@mui/icons-material/Person';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import WarningIcon from '@mui/icons-material/Warning';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import MonitorIcon from '@mui/icons-material/Monitor';
+import toast from 'react-hot-toast';
+import socket from '../socket';
+import { useAuthStore } from '../context/store';
+import { getAllQuizzes, getQuizSubmissions } from '../services/quizService';
 
 const MonitorSessions = () => {
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
-  const [activeSessions] = useState([
-    { id: 1, student: 'John Doe', quiz: 'Mathematics Quiz 1', status: 'active', flags: 0, progress: 45, timeLeft: '15:30' },
-    { id: 2, student: 'Jane Smith', quiz: 'Science Quiz 2', status: 'active', flags: 2, progress: 60, timeLeft: '12:45' },
-    { id: 3, student: 'Bob Johnson', quiz: 'History Quiz 1', status: 'active', flags: 1, progress: 30, timeLeft: '20:15' }
-  ]);
+  useMediaQuery(theme.breakpoints.down('sm'));
+  useMediaQuery(theme.breakpoints.down('md'));
+  const { user } = useAuthStore();
+  const [loading, setLoading] = useState(true);
+  const [activeSessions, setActiveSessions] = useState([]);
+  const [liveAlerts, setLiveAlerts] = useState([]);
 
-  const stats = [
-    { title: 'Active Sessions', value: activeSessions.length, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
-    { title: 'Flagged Activities', value: activeSessions.reduce((sum, s) => sum + s.flags, 0), gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
-    { title: 'Avg Progress', value: `${Math.round(activeSessions.reduce((sum, s) => sum + s.progress, 0) / activeSessions.length)}%`, gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }
-  ];
+  useEffect(() => {
+    const loadSessions = async () => {
+      try {
+        setLoading(true);
+        const quizResponse = await getAllQuizzes();
+        const quizzes = quizResponse?.data || [];
+
+        const submissionResponses = await Promise.all(
+          quizzes.map(async (quiz) => {
+            try {
+              const res = await getQuizSubmissions(quiz._id);
+              return { quiz, submissions: res?.data || [] };
+            } catch {
+              return { quiz, submissions: [] };
+            }
+          })
+        );
+
+        const inProgress = submissionResponses.flatMap(({ quiz, submissions }) =>
+          submissions
+            .filter((s) => s.status === 'in_progress')
+            .map((s) => ({
+              id: s._id,
+              quizId: quiz._id,
+              quiz: quiz.title,
+              student: `${s.student?.firstName || ''} ${s.student?.lastName || ''}`.trim() || 'Unknown Student',
+              studentEmail: s.student?.email || '-',
+              flags: (s.suspiciousActivityDetected ? 1 : 0) + (s.activityLogs?.length || 0),
+              progress: Math.min(100, Math.round(((s.answers?.length || 0) / Math.max(quiz.totalQuestions || 1, 1)) * 100)),
+              timeLeft: '-',
+              status: 'active'
+            }))
+        );
+
+        setActiveSessions(inProgress);
+      } catch (error) {
+        toast.error('Failed to load monitor sessions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSessions();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    socket.on('alert', (data) => {
+      setLiveAlerts((prev) => [
+        {
+          id: `${Date.now()}-${Math.random()}`,
+          alertType: data.alertType,
+          message: data.message || `${data.activity || 'Violation'} detected`,
+          studentName: data.studentName || data.studentId,
+          studentEmail: data.studentEmail,
+          severity: data.severity || 'high',
+          timestamp: new Date().toISOString()
+        },
+        ...prev
+      ].slice(0, 10));
+    });
+
+    return () => {
+      socket.off('alert');
+    };
+  }, [user]);
+
+  const stats = useMemo(() => {
+    const activeCount = activeSessions.length;
+    const flagged = activeSessions.reduce((sum, s) => sum + (s.flags || 0), 0);
+    const avgProgress = activeCount > 0
+      ? `${Math.round(activeSessions.reduce((sum, s) => sum + (s.progress || 0), 0) / activeCount)}%`
+      : '0%';
+
+    return [
+      { title: 'Active Sessions', value: activeCount, gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+      { title: 'Flagged Activities', value: flagged, gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
+      { title: 'Avg Progress', value: avgProgress, gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' }
+    ];
+  }, [activeSessions]);
 
   return (
     <MainLayout>
@@ -108,6 +187,11 @@ const MonitorSessions = () => {
                 </Box>
 
                 <List>
+                  {loading && (
+                    <Typography color="text.secondary" sx={{ py: 2 }}>
+                      Loading live sessions...
+                    </Typography>
+                  )}
                   {activeSessions.map((session, index) => (
                     <React.Fragment key={session.id}>
                       <ListItem
@@ -123,6 +207,7 @@ const MonitorSessions = () => {
                             variant="outlined"
                             size="small"
                             startIcon={<VisibilityIcon />}
+                            onClick={() => navigate(`/monitoring/${session.quizId}`)}
                             sx={{ textTransform: 'none', minHeight: '44px', fontSize: { xs: '0.85rem', sm: '0.9rem', md: '1rem' } }}
                           >
                             Monitor
@@ -145,6 +230,9 @@ const MonitorSessions = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                               <Typography variant="body1" fontWeight="600" sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>
                                 {session.student}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {session.studentEmail}
                               </Typography>
                               <Chip 
                                 label="LIVE" 
@@ -190,6 +278,27 @@ const MonitorSessions = () => {
                     <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>
                       Active quiz sessions will appear here
                     </Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', mt: 3 }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+                  Live Violation Alerts
+                </Typography>
+                {liveAlerts.length === 0 ? (
+                  <Typography color="text.secondary">No violations detected yet.</Typography>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {liveAlerts.map((alert) => (
+                      <Alert key={alert.id} severity={alert.severity === 'critical' ? 'error' : 'warning'}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{alert.alertType}</Typography>
+                        <Typography variant="body2">{alert.studentName} {alert.studentEmail ? `(${alert.studentEmail})` : ''}</Typography>
+                        <Typography variant="caption">{alert.message}</Typography>
+                      </Alert>
+                    ))}
                   </Box>
                 )}
               </CardContent>

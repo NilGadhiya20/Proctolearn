@@ -471,6 +471,116 @@ const AdminDashboard = () => {
                   )}
                 </motion.div>
 
+                {/* Recent Quizzes Section */}
+                <motion.div 
+                  variants={itemVariants}
+                  className="dashboard-card bg-white rounded-2xl border border-slate-200 p-6 shadow-lg"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-lg">
+                        <BookOpen className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-900">Recent Quizzes</h3>
+                        <p className="text-sm text-slate-600">Latest quizzes from all faculty</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('quizzes')}
+                      className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                    >
+                      View All →
+                    </button>
+                  </div>
+                  
+                  {loading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4].map((i) => (
+                        <div key={i} className="animate-pulse flex items-center gap-4 p-4 bg-slate-50 rounded-lg">
+                          <div className="h-12 w-12 bg-slate-200 rounded-lg"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                            <div className="h-3 bg-slate-200 rounded w-1/2"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : recentQuizzes.length === 0 ? (
+                    <div className="text-center py-12">
+                      <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-slate-600 font-medium">No quizzes available yet</p>
+                      <p className="text-sm text-slate-500 mb-4">Create your first quiz to get started</p>
+                      <button
+                        onClick={() => navigate('/create-quiz')}
+                        className="btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Create Quiz
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {recentQuizzes.map((quiz, idx) => (
+                        <motion.div
+                          key={quiz._id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          className="group flex items-center gap-4 p-4 bg-slate-50 hover:bg-indigo-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-indigo-200"
+                          onClick={() => navigate(`/quiz/${quiz._id}`)}
+                        >
+                          <div className={`p-3 rounded-lg ${
+                            quiz.status === 'published' 
+                              ? 'bg-emerald-100' 
+                              : quiz.status === 'draft' 
+                                ? 'bg-slate-200' 
+                                : 'bg-orange-100'
+                          }`}>
+                            <BookOpen className={`h-6 w-6 ${
+                              quiz.status === 'published' 
+                                ? 'text-emerald-600' 
+                                : quiz.status === 'draft' 
+                                  ? 'text-slate-600' 
+                                  : 'text-orange-600'
+                            }`} />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-slate-900 group-hover:text-indigo-700 transition-colors">
+                              {quiz.title}
+                            </h4>
+                            <div className="flex items-center gap-4 mt-1 text-sm text-slate-600">
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {quiz.duration} mins
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Target className="h-3 w-3" />
+                                {quiz.totalMarks || 0} marks
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                quiz.status === 'published' 
+                                  ? 'bg-emerald-100 text-emerald-700' 
+                                  : quiz.status === 'draft' 
+                                    ? 'bg-slate-200 text-slate-700' 
+                                    : 'bg-orange-100 text-orange-700'
+                              }`}>
+                                {quiz.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {new Date(quiz.createdAt).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric' 
+                            })}
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  )}
+                </motion.div>
+
                 {/* Platform Analytics - User Growth & Quiz Creation */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {loading ? (

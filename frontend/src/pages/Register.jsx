@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import Reveal from '../components/Reveal';
 import { CheckCircle, Eye, EyeOff, GraduationCap, Lock, Mail, User } from 'lucide-react';
 import api from '../services/api';
-import { signInWithGoogle, completeSupabaseOAuth } from '../config/firebaseConfig';
+import { signInWithGoogle } from '../services/authService';
 import { useAuthStore } from '../context/store';
 import AuthNavbar from '../components/Common/AuthNavbar';
 import AuthFooter from '../components/Common/AuthFooter';
@@ -45,55 +45,6 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
   const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    const handleSupabaseCallback = async () => {
-      const hasOAuthParams =
-        window.location.hash.includes('access_token') ||
-        window.location.hash.includes('refresh_token') ||
-        window.location.search.includes('code=');
-
-      if (!hasOAuthParams) return;
-
-      setOauthLoading(true);
-
-      try {
-        const session = await completeSupabaseOAuth();
-        if (!session?.provider_token) {
-          throw new Error('Google provider token not returned from Supabase.');
-        }
-
-        const response = await api.post('/auth/google', {
-          accessToken: session.provider_token,
-          institutionCode: 'DEFAULT'
-        });
-
-        if (response.data.success) {
-          const userData = response.data.data.user;
-          const token = response.data.data.token;
-
-          setToken(token);
-          setUser(userData);
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(userData));
-
-          const role = userData.role?.toLowerCase();
-          if (role === 'admin') navigate('/admin/dashboard');
-          else if (role === 'faculty') navigate('/faculty/dashboard');
-          else navigate('/student/dashboard');
-        } else {
-          toast.error(response.data.message || 'Google sign-in failed.');
-        }
-      } catch (error) {
-        const message = error?.response?.data?.message || error.message || 'Google sign-in failed.';
-        toast.error(message);
-      } finally {
-        setOauthLoading(false);
-      }
-    };
-
-    handleSupabaseCallback();
-  }, [navigate, setToken, setUser]);
 
   const validateForm = () => {
     const nextErrors = {};
@@ -193,11 +144,38 @@ const Register = () => {
   const handleGoogleAuth = async () => {
     setOauthLoading(true);
     try {
-      await signInWithGoogle();
-      setOauthLoading(false);
+      const result = await signInWithGoogle();
+
+      if (!result?.idToken && !result?.accessToken) {
+        throw new Error('Google token not returned from Firebase.');
+      }
+
+      const response = await api.post('/auth/google', {
+        idToken: result.idToken || undefined,
+        accessToken: result.accessToken || undefined,
+        institutionCode: 'DEFAULT'
+      });
+
+      if (response.data.success) {
+        const userData = response.data.data.user;
+        const token = response.data.data.token;
+
+        setToken(token);
+        setUser(userData);
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        const role = userData.role?.toLowerCase();
+        if (role === 'admin') navigate('/admin/dashboard');
+        else if (role === 'faculty') navigate('/faculty/dashboard');
+        else navigate('/student/dashboard');
+      } else {
+        toast.error(response.data.message || 'Google sign-in failed.');
+      }
     } catch (error) {
-      const message = error?.message || 'Google sign-in failed.';
+      const message = error?.response?.data?.message || error.message || 'Google sign-in failed.';
       toast.error(message);
+    } finally {
       setOauthLoading(false);
     }
   };
@@ -303,7 +281,7 @@ const Register = () => {
                   icon={<Lock className="h-4 w-4" />}
                   required
                   trailing={
-                    <button type="button" onClick={() => setShowPassword((p) => !p)} className="text-slate-400 hover:text-slate-600">
+                    <button type="button" onClick={() => setShowPassword((p) => !p)} className="text-slate-400 hover:text-slate-600 transition-colors duration-300 relative group\">
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   }
@@ -383,7 +361,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-700 disabled:opacity-60"
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:shadow-[0_15px_40px_rgba(5,150,105,0.35)] hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 disabled:opacity-60"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
@@ -398,7 +376,7 @@ const Register = () => {
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={oauthLoading}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-300 hover:shadow-[0_10px_25px_rgba(15,23,42,0.12)] hover:border-emerald-300 hover:bg-emerald-50/30 hover:scale-[1.02] active:scale-95 disabled:opacity-60"
                   >
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-5 w-5" />
                     {oauthLoading ? 'Connecting to Google...' : 'Continue with Google'}
@@ -409,7 +387,7 @@ const Register = () => {
 
             <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-slate-500">
               Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-emerald-700 hover:text-emerald-800">Log in</Link>
+              <Link to="/login" className="font-semibold text-emerald-700 hover:text-emerald-800 relative group">Log in<span className="absolute bottom-0 left-0 w-0 bg-emerald-700 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span></Link>
             </motion.p>
           </motion.div>
           </Reveal>

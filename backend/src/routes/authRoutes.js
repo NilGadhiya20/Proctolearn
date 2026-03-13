@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, refreshAccessToken, getCurrentUser, logoutUser, googleAuthLogin, verifyEmailExists, requestFacultyRole, getFacultyRequests, reviewFacultyRequest } from '../controllers/authController.js';
+import { registerUser, loginUser, refreshAccessToken, getCurrentUser, logoutUser, googleAuthLogin, verifyEmailExists, requestFacultyRole, getFacultyRequests, reviewFacultyRequest, forgotPassword, resetPassword, testEmailConfiguration } from '../controllers/authController.js';
 import { validateUserRegistration, validateUserLogin } from '../middleware/validation.js';
 import { auth, checkRole } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/errorHandler.js';
@@ -15,6 +15,9 @@ router.post('/login', validateUserLogin, loginUser);
 router.post('/refresh-token', refreshAccessToken);
 router.post('/google', googleAuthLogin);
 router.post('/verify-email', verifyEmailExists);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.post('/test-email', testEmailConfiguration); // For testing email configuration
 
 // Protected Routes
 router.get('/me', auth, getCurrentUser);

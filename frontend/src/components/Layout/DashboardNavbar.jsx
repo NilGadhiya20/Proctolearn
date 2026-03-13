@@ -56,6 +56,7 @@ const DashboardNavbar = () => {
       admin: [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
         { icon: Users, label: 'Manage Users', path: '/manage-users' },
+        { icon: Users, label: 'View Students', path: '/students' },
         { icon: FileText, label: 'Create Quiz', path: '/create-quiz' },
         { icon: BarChart3, label: 'View Reports', path: '/view-reports' },
         { icon: Eye, label: 'Monitor', path: '/monitor-sessions' },
@@ -144,11 +145,11 @@ const DashboardNavbar = () => {
           <div className="flex justify-between items-center">
             {/* Logo - Left */}
             <Link to="/" className="flex items-center gap-3 flex-shrink-0 group">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 group-hover:scale-110 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-emerald-200/50 group-hover:shadow-[0_10px_25px_rgba(5,150,105,0.3)] group-hover:scale-110 transition-all duration-300">
                 <GraduationCap className="text-white w-5 h-5" />
               </div>
               <div className="hidden sm:block">
-                <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight">
+                <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-lime-500 bg-clip-text text-transparent tracking-tight group-hover:drop-shadow-md transition-all duration-300">
                   Proctolearn
                 </span>
               </div>
@@ -165,11 +166,11 @@ const DashboardNavbar = () => {
                     to={item.path}
                     className={`nav-link flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
                       isActive 
-                        ? 'text-emerald-700 bg-white shadow-sm' 
-                        : 'text-slate-600 hover:text-emerald-600 hover:bg-white/50'
+                        ? 'text-emerald-700 bg-white shadow-md shadow-emerald-200/50' 
+                        : 'text-black hover:text-emerald-600 hover:bg-white/80 hover:shadow-[0_8px_20px_rgba(5,150,105,0.12)]'
                     }`}
                   >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-500' : ''}`} />
+                    <Icon className={`w-4 h-4 transition-colors duration-300 ${isActive ? 'text-emerald-500' : ''}`} />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -181,7 +182,7 @@ const DashboardNavbar = () => {
               {/* Support Button - Desktop */}
               <Link 
                 to="/support" 
-                className="hidden md:flex items-center gap-2 text-slate-600 hover:text-emerald-600 font-semibold text-sm transition-colors mr-2"
+                className="hidden md:flex items-center gap-2 text-black hover:text-emerald-600 font-semibold text-sm transition-all duration-300 rounded-lg px-3 py-2 hover:bg-emerald-50/50 hover:shadow-[0_4px_12px_rgba(5,150,105,0.08)] mr-2"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Support</span>
@@ -196,17 +197,17 @@ const DashboardNavbar = () => {
               <div className="relative" ref={profileMenuRef}>
                 <button 
                   onClick={() => setProfileMenuOpen(!profileMenuOpen)}
-                  className="flex items-center gap-3 p-1 rounded-full hover:bg-slate-50 transition-colors focus:outline-none"
+                  className="flex items-center gap-3 p-1 rounded-full hover:bg-emerald-50/50 hover:shadow-[0_4px_12px_rgba(5,150,105,0.1)] transition-all duration-300 focus:outline-none"
                 >
                   <div className="text-right hidden md:block mr-1">
-                    <div className="text-sm font-bold text-slate-700 leading-tight">
+                    <div className="text-sm font-bold text-black leading-tight">
                       {user?.firstName} {user?.lastName}
                     </div>
-                    <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                    <div className="text-[10px] font-bold text-black uppercase tracking-wider">
                       {user?.role}
                     </div>
                   </div>
-                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getRoleColor(user?.role)} flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white hover:ring-emerald-200 transition-all cursor-pointer`}>
+                  <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getRoleColor(user?.role)} flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white hover:ring-emerald-300 hover:shadow-[0_8px_20px_rgba(5,150,105,0.3)] transition-all duration-300 cursor-pointer`}>
                     {getInitials(user?.firstName, user?.lastName)}
                   </div>
                 </button>
@@ -222,15 +223,15 @@ const DashboardNavbar = () => {
                       className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100]"
                     >
                       <div className="p-4 bg-slate-50 border-b border-slate-100 md:hidden">
-                        <div className="font-bold text-slate-800">{user?.firstName} {user?.lastName}</div>
-                        <div className="text-xs text-emerald-600 font-semibold uppercase">{user?.role}</div>
+                        <div className="font-bold text-black">{user?.firstName} {user?.lastName}</div>
+                        <div className="text-xs text-black font-semibold uppercase">{user?.role}</div>
                         <div className="text-xs text-slate-500 truncate">{user?.email}</div>
                       </div>
                       <div className="p-2 space-y-1">
                         <Link 
                           to="/profile" 
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-black hover:text-emerald-600 hover:bg-emerald-50/80 rounded-xl transition-all duration-300 hover:shadow-[0_4px_12px_rgba(5,150,105,0.08)]"
                         >
                           <User className="w-4 h-4" />
                           My Profile
@@ -238,7 +239,7 @@ const DashboardNavbar = () => {
                         <Link 
                           to="/settings" 
                           onClick={() => setProfileMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-black hover:text-emerald-600 hover:bg-emerald-50/80 rounded-xl transition-all duration-300 hover:shadow-[0_4px_12px_rgba(5,150,105,0.08)]"
                         >
                           <Settings className="w-4 h-4" />
                           Settings
@@ -247,7 +248,7 @@ const DashboardNavbar = () => {
                       <div className="p-2 border-t border-slate-100 bg-slate-50/50">
                         <button 
                           onClick={handleLogout}
-                          className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          className="flex items-center gap-3 px-3 py-2 w-full text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50/80 rounded-xl transition-all duration-300 hover:shadow-[0_4px_12px_rgba(239,68,68,0.1)]"
                         >
                           <LogOut className="w-4 h-4" />
                           Sign Out
@@ -260,7 +261,7 @@ const DashboardNavbar = () => {
 
               {/* Mobile Menu Button */}
               <button 
-                className="lg:hidden p-2 text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                className="lg:hidden p-2 text-black hover:text-emerald-600 hover:bg-emerald-50/50 hover:shadow-[0_4px_12px_rgba(5,150,105,0.1)] rounded-xl transition-all duration-300"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -286,7 +287,7 @@ const DashboardNavbar = () => {
                       key={item.label}
                       to={item.path}
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 font-medium transition-colors"
+                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-black hover:text-emerald-600 hover:bg-emerald-50/80 font-medium transition-all duration-300 hover:shadow-[0_4px_12px_rgba(5,150,105,0.08)]"
                     >
                       <Icon className="w-5 h-5" />
                       {item.label}
@@ -297,7 +298,7 @@ const DashboardNavbar = () => {
                 <Link
                   to="/support"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:text-emerald-600 hover:bg-emerald-50 font-medium transition-colors"
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl text-black hover:text-emerald-600 hover:bg-emerald-50/80 font-medium transition-all duration-300 hover:shadow-[0_4px_12px_rgba(5,150,105,0.08)]"
                 >
                   <MessageSquare className="w-5 h-5" />
                   Support

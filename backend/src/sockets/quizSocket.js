@@ -39,6 +39,48 @@ export const initializeSocketIO = (server) => {
   // Track active quizzes
   const activeQuizzes = new Map();
 
+  const normalizeActivityType = (rawType) => {
+    const type = String(rawType || '').toLowerCase();
+
+    if (['tab_switch', 'tab-switch', 'tab_change', 'shortcut_alt_tab', 'shortcut_ctrl_tab', 'shortcut_meta_tab'].includes(type)) {
+      return ACTIVITY_TYPES.TAB_CHANGE;
+    }
+
+    if (['fullscreen_exit', 'fullscreen-exit'].includes(type)) {
+      return ACTIVITY_TYPES.FULLSCREEN_EXIT;
+    }
+
+    if (['fullscreen_enter', 'fullscreen-enter'].includes(type)) {
+      return ACTIVITY_TYPES.FULLSCREEN_ENTER;
+    }
+
+    if (['copy_attempt', 'copy', 'copy-paste', 'clipboard_blocked'].includes(type)) {
+      return ACTIVITY_TYPES.COPY_ATTEMPT;
+    }
+
+    if (['paste_attempt', 'paste'].includes(type)) {
+      return ACTIVITY_TYPES.PASTE_ATTEMPT;
+    }
+
+    if (['right_click', 'right-click', 'right_click_blocked'].includes(type)) {
+      return ACTIVITY_TYPES.RIGHT_CLICK;
+    }
+
+    if (['keyboard_shortcut', 'clipboard_shortcut_blocked'].includes(type)) {
+      return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
+    }
+
+    if (['window_blur'].includes(type)) {
+      return ACTIVITY_TYPES.WINDOW_BLUR;
+    }
+
+    if (['page_visibility_change', 'window_close_attempt', 'page_refresh', 'browser_closed', 'beforeunload'].includes(type)) {
+      return ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE;
+    }
+
+    return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
+  };
+
   io.on('connection', (socket) => {
     console.log('New user connected:', socket.id);
 
@@ -46,9 +88,11 @@ export const initializeSocketIO = (server) => {
     socket.on('join-quiz', (data) => {
       const { submissionId, quizId, studentId } = data;
       socket.join(`quiz-${quizId}`);
-      socket.join(`submission-${submissionId}`);
+      if (submissionId) {
+        socket.join(`submission-${submissionId}`);
+      }
 
-      if (!activeQuizzes.has(submissionId)) {
+      if (submissionId && studentId && !activeQuizzes.has(submissionId)) {
         activeQuizzes.set(submissionId, {
           submissionId,
           quizId,
@@ -106,6 +150,9 @@ export const initializeSocketIO = (server) => {
     // Log student activity
     socket.on('activity', async (data) => {
       const { submissionId, quizId, activityType, details } = data;
+      const studentName = data.studentName || 'Unknown Student';
+      const studentEmail = data.studentEmail || 'No email';
+      const normalizedActivityType = normalizeActivityType(activityType);
 
       try {
         // Save activity to database
@@ -114,9 +161,9 @@ export const initializeSocketIO = (server) => {
           student: data.studentId,
           quiz: quizId,
           institution: data.institutionId,
-          activityType,
+          activityType: normalizedActivityType,
           severity: ActivityAnalyzer.getSeverityFromScore(0), // Initial severity
-          description: `User performed: ${activityType}`,
+          description: `User performed: ${normalizedActivityType}`,
           timestamp: new Date(),
           details,
           ipAddress: socket.handshake.address,
@@ -133,7 +180,9 @@ export const initializeSocketIO = (server) => {
         io.to(`quiz-${quizId}`).emit('activity-logged', {
           submissionId,
           studentId: data.studentId,
-          activityType,
+          studentName,
+          studentEmail,
+          activityType: normalizedActivityType,
           severity: activity.severity,
           timestamp: new Date()
         });
@@ -141,15 +190,77 @@ export const initializeSocketIO = (server) => {
         // Broadcast lightweight activity feed for admins
         io.to('admins').emit('dashboard-activity', {
           type: activityType,
+          normalizedType: normalizedActivityType,
           severity: activity.severity,
           quizId,
           submissionId,
           studentId: data.studentId,
+          studentName,
+          studentEmail,
           timestamp: new Date().toISOString()
         });
 
-        // Check for suspicious activity
-        if ([ACTIVITY_TYPES.TAB_CHANGE, ACTIVITY_TYPES.FULLSCREEN_EXIT].includes(activityType)) {
+        // Instant faculty alerts for key proctoring events
+        if (normalizedActivityType === ACTIVITY_TYPES.FULLSCREEN_EXIT) {
+          io.to(`quiz-${quizId}`).emit('alert', {
+            submissionId,
+            studentId: data.studentId,
+            studentName,
+            studentEmail,
+            alertType: 'FULLSCREEN_EXIT',
+            severity: ALERT_SEVERITY.CRITICAL,
+            activity: normalizedActivityType,
+            score: 100,
+            message: `${studentName} (${studentEmail}) exited fullscreen during quiz attempt`
+          });
+
+          io.to(`quiz-${quizId}`).emit('fullscreenExitDetected', {
+            submissionId,
+            studentId: data.studentId,
+            studentName,
+            studentEmail,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        if (normalizedActivityType === ACTIVITY_TYPES.TAB_CHANGE) {
+          io.to(`quiz-${quizId}`).emit('alert', {
+            submissionId,
+            studentId: data.studentId,
+            studentName,
+            studentEmail,
+            alertType: 'TAB_SWITCH',
+            severity: ALERT_SEVERITY.HIGH,
+            activity: normalizedActivityType,
+            score: 80,
+            message: `${studentName} (${studentEmail}) switched tab/window during quiz attempt`
+          });
+
+          io.to(`quiz-${quizId}`).emit('tabSwitchDetected', {
+            submissionId,
+            studentId: data.studentId,
+            studentName,
+            studentEmail,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        if (normalizedActivityType === ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE) {
+          io.to(`quiz-${quizId}`).emit('alert', {
+            submissionId,
+            studentId: data.studentId,
+            studentName,
+            studentEmail,
+            alertType: 'PAGE_REFRESH_OR_CLOSE_ATTEMPT',
+            severity: ALERT_SEVERITY.HIGH,
+            activity: normalizedActivityType,
+            score: 75,
+            message: `${studentName} (${studentEmail}) attempted page refresh/close or lost page visibility`
+          });
+        }
+
+        // Check for suspicious activity score
+        if ([ACTIVITY_TYPES.TAB_CHANGE, ACTIVITY_TYPES.FULLSCREEN_EXIT, ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE].includes(normalizedActivityType)) {
           const activities = submission?.activities || [];
           const suspicionScore = ActivityAnalyzer.calculateSuspicionScore(activities, 60);
 
@@ -157,10 +268,13 @@ export const initializeSocketIO = (server) => {
             io.to(`quiz-${quizId}`).emit('alert', {
               submissionId,
               studentId: data.studentId,
+              studentName,
+              studentEmail,
               alertType: 'SUSPICIOUS_ACTIVITY',
               severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
               score: suspicionScore,
-              activity: activityType
+              activity: normalizedActivityType,
+              message: `${studentName} (${studentEmail}) triggered suspicious activity`
             });
           }
         }

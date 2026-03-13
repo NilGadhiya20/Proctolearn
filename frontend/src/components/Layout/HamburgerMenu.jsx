@@ -24,10 +24,10 @@ const HamburgerMenu = ({
   };
 
   const variants = {
-    default: 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600 hover:text-slate-900',
+    default: 'bg-white hover:bg-slate-50 border-slate-200 text-black hover:text-slate-900',
     primary: 'bg-emerald-500 hover:bg-emerald-600 border-emerald-600 text-white',
-    ghost: 'bg-transparent hover:bg-slate-100 border-transparent text-slate-600 hover:text-slate-900',
-    outline: 'bg-transparent hover:bg-slate-50 border-slate-300 text-slate-600 hover:text-slate-900'
+    ghost: 'bg-transparent hover:bg-slate-100 border-transparent text-black hover:text-slate-900',
+    outline: 'bg-transparent hover:bg-slate-50 border-slate-300 text-black hover:text-slate-900'
   };
 
   const buttonVariants = {

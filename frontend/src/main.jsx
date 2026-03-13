@@ -47,9 +47,10 @@ if (!root) {
         <ErrorBoundary>
           <AppWorking />
           <Toaster 
-            position="top-right"
+            position="top-center"
             toastOptions={{
               duration: 4000,
+              className: 'proctolearn-toast',
               style: {
                 background: '#ffffff',
                 color: '#1e293b',
@@ -59,6 +60,7 @@ if (!root) {
                 fontSize: '14px',
                 fontWeight: '500',
                 maxWidth: '400px',
+                textAlign: 'center',
               },
               success: {
                 duration: 3000,

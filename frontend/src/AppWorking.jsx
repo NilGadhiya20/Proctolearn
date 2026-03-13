@@ -44,13 +44,18 @@ const FacultyLiveMonitoring = React.lazy(() => import('./pages/FacultyLiveMonito
 const Chat = React.lazy(() => import('./pages/Chat').catch(e => { console.error('Chat import error:', e); return { default: () => <div>Error loading Chat</div> }; }));
 const Support = React.lazy(() => import('./pages/Support').catch(e => { console.error('Support import error:', e); return { default: () => <div>Error loading Support</div> }; }));
 const RequestFacultyRole = React.lazy(() => import('./components/Student/RequestFacultyRole').catch(e => { console.error('RequestFacultyRole import error:', e); return { default: () => <div>Error loading RequestFacultyRole</div> }; }));
+import AnimatedLoader from './components/Common/AnimatedLoader';
 
 // Placeholder page for settings and support
 const SettingsPage = () => <div style={{ padding: '20px' }}>Settings Page - Coming Soon</div>;
 
 // Loading fallback
 function LoadingFallback() {
-  return <div style={{ padding: '50px', textAlign: 'center', fontFamily: 'Arial' }}>Loading...</div>;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+      <AnimatedLoader message="Loading page" size="large" />
+    </div>
+  );
 }
 
 const AppWorking = () => {

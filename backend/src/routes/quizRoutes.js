@@ -12,8 +12,15 @@ import {
   saveQuestionAnswer,
   submitQuiz,
   getStudentSubmission,
+  getStudentSubmissions,
   getQuizSubmissions,
-  getSubmissionActivityLogs
+  getSubmissionActivityLogs,
+  startExamSession,
+  logSecurityEvent,
+  submitExam,
+  autoSubmitExam,
+  getExamSession,
+  toggleQuizStatus
 } from '../controllers/quizController.js';
 import { auth, checkRole, verifyInstitutionAccess } from '../middleware/auth.js';
 import { validateQuizCreation } from '../middleware/validation.js';
@@ -61,6 +68,14 @@ router.post('/:id/publish',
   checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
   verifyInstitutionAccess, 
   publishQuiz
+);
+
+// Toggle quiz status (activate/deactivate)
+router.patch('/:id/status', 
+  auth, 
+  checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
+  verifyInstitutionAccess, 
+  toggleQuizStatus
 );
 
 router.post('/:id/assign-students', 
@@ -113,6 +128,14 @@ router.get('/:id/submission',
   getStudentSubmission
 );
 
+// Get current student's all submissions
+router.get('/users/me/submissions',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  verifyInstitutionAccess,
+  getStudentSubmissions
+);
+
 // ===========================
 // FACULTY MONITORING APIs
 // ===========================
@@ -131,6 +154,46 @@ router.get('/submission/:submissionId/logs',
   checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
   verifyInstitutionAccess,
   getSubmissionActivityLogs
+);
+
+// ===========================
+// SECURE EXAM SESSION APIs
+// ===========================
+
+// Start exam session - Initialize with security tracking
+router.post('/:quizId/exam/start',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  verifyInstitutionAccess,
+  startExamSession
+);
+
+// Log security events (right-click, tab switch, copy-paste)
+router.post('/exam/:sessionId/log-event',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  logSecurityEvent
+);
+
+// Submit exam with answers
+router.post('/exam/:sessionId/submit',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  submitExam
+);
+
+// Auto submit exam (when time ends)
+router.post('/exam/:sessionId/auto-submit',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  autoSubmitExam
+);
+
+// Get exam session details
+router.get('/exam/:sessionId/details',
+  auth,
+  checkRole(USER_ROLES.STUDENT),
+  getExamSession
 );
 
 export default router;

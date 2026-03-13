@@ -89,7 +89,7 @@ const FacultyDashboard = () => {
         setLoading(true);
         const token = localStorage.getItem('token');
 
-        const res = await fetch(`${API_BASE_URL}/quiz`, {
+        const res = await fetch(`${API_BASE_URL}/quizzes`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();

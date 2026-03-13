@@ -69,6 +69,11 @@ const CreateQuiz = () => {
     endDate: ''
   });
 
+  const [attemptSettings, setAttemptSettings] = useState({
+    hasLimit: false,
+    maxAttempts: '1'
+  });
+
   const [proctoring, setProctoringOptions] = useState({
     enabled: true,
     requiresFullscreen: true,
@@ -89,6 +94,10 @@ const CreateQuiz = () => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAttemptSettingsChange = (name, value) => {
+    setAttemptSettings(prev => ({ ...prev, [name]: value }));
   };
 
   const handleProctoringChange = (name) => {
@@ -222,12 +231,21 @@ const CreateQuiz = () => {
         passingMarks: parseInt(formData.passingMarks),
         subject: formData.subject,
         chapter: formData.chapter,
+        attemptSettings: {
+          hasLimit: attemptSettings.hasLimit,
+          maxAttempts: attemptSettings.hasLimit ? parseInt(attemptSettings.maxAttempts) : null
+        },
         proctoring,
-        accessWindow: {
-          startDate: formData.startDate ? new Date(formData.startDate).toISOString() : undefined,
-          endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined,
-        }
+        accessWindow: {}
       };
+
+      // Only add dates if they are provided
+      if (formData.startDate) {
+        quizPayload.accessWindow.startDate = new Date(formData.startDate).toISOString();
+      }
+      if (formData.endDate) {
+        quizPayload.accessWindow.endDate = new Date(formData.endDate).toISOString();
+      }
 
       const quizRes = await createQuiz(quizPayload);
       if (!quizRes.success) {
@@ -443,6 +461,14 @@ const CreateQuiz = () => {
                       {formData.passingMarks}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">Passing Marks</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Box sx={{ textAlign: 'center', p: 2, bgcolor: '#e0e7ff', borderRadius: 2 }}>
+                    <Typography variant="h6" fontWeight="700" sx={{ color: '#4f46e5', mb: 0.5 }}>
+                      {attemptSettings.hasLimit ? attemptSettings.maxAttempts : '∞'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">Max Attempts</Typography>
                   </Box>
                 </Grid>
               </Grid>
@@ -890,6 +916,40 @@ const CreateQuiz = () => {
               InputProps={{ inputProps: { min: 1 } }}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
             />
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Box sx={{ p: 2.5, bgcolor: '#f8fafc', borderRadius: 2, border: '1px solid #e2e8f0' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="600" sx={{ color: '#1e293b' }}>
+                    Limit Attempts
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {attemptSettings.hasLimit ? 'Students can attempt a limited number of times' : 'Students can attempt unlimited times'}
+                  </Typography>
+                </Box>
+                <Switch
+                  checked={attemptSettings.hasLimit}
+                  onChange={(e) => handleAttemptSettingsChange('hasLimit', e.target.checked)}
+                  sx={{ ml: 2 }}
+                />
+              </Box>
+
+              {attemptSettings.hasLimit && (
+                <TextField
+                  fullWidth
+                  label="Maximum Attempts"
+                  type="number"
+                  value={attemptSettings.maxAttempts}
+                  onChange={(e) => handleAttemptSettingsChange('maxAttempts', e.target.value)}
+                  placeholder="1"
+                  InputProps={{ inputProps: { min: 1, max: 10 } }}
+                  helperText="Number of times students can attempt this quiz (1-10)"
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              )}
+            </Box>
           </Grid>
           
           <Grid item xs={12}>

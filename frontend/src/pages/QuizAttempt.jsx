@@ -5,11 +5,51 @@ import { Flag as FlagIcon, FlagOutlined as FlagOutlinedIcon,Fullscreen as Fullsc
 import toast from 'react-hot-toast';
 import { getQuizForAttempt, saveAnswer, submitQuiz } from '../services/quizAttemptService';
 import { KEYS } from '../utils/keyboardNavigation';
-import { useEscapeKey, useFocusTrap } from '../hooks/useKeyboardNavigation';
+import AnimatedLoader from '../components/Common/AnimatedLoader';
+import { useAuthStore } from '../context/store';
+import socket from '../socket';
+
+// Fallback hooks if not available
+const useEscapeKey = (open, callback) => {
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') callback();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open, callback]);
+};
+
+const useFocusTrap = (open, ref) => {
+  useEffect(() => {
+    if (!open || !ref.current) return;
+    ref.current.focus();
+  }, [open, ref]);
+};
 
 export default function QuizAttempt() {
-  const { id: quizId } = useParams();
+  const params = useParams();
+  const { quizId } = params;
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  
+  // Check if component was loaded directly without ID
+  useEffect(() => {
+    if (!quizId) {
+      console.error('🚨 CRITICAL: Quiz page loaded without quizId!');
+      console.error('   This usually means:');
+      console.error('   1. You visited /quiz directly');
+      console.error('   2. navigate() was called with undefined quizId');
+      console.error('   3. The URL pattern does not match');
+      
+      setTimeout(() => {
+        toast.error('Invalid quiz ID. Please select a quiz from available quizzes.');
+        navigate('/available-quizzes');
+      }, 1000);
+      return;
+    }
+  }, [quizId, navigate]);
 
   // State
   const [quiz, setQuiz] = useState(null);
@@ -23,10 +63,74 @@ export default function QuizAttempt() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [openSubmitDialog, setOpenSubmitDialog] = useState(false);
+  const [fullscreenPromptOpen, setFullscreenPromptOpen] = useState(false);
+  
+  // If no quizId, show error screen
+  if (!quizId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 text-center max-w-md">
+          <h1 className="text-2xl font-bold text-red-600 mb-4">Invalid Quiz ID</h1>
+          <p className="text-gray-600 mb-6">The quiz ID is missing. Please select a quiz from the available quizzes page.</p>
+          <button
+            onClick={() => navigate('/available-quizzes')}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg"
+          >
+            Go to Available Quizzes
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   const timerRef = useRef(null);
   const tabBlurRef = useRef(0);
+  const lastTabEventAtRef = useRef(0);
+  const copyPasteRef = useRef(0);
+  const autoSubmitTriggeredRef = useRef(false);
   const containerRef = useRef(null);
   const dialogRef = useRef(null);
+
+  const MAX_TAB_SWITCHES = 3;
+  const MAX_COPY_PASTE_ALERTS = 3;
+
+  const proctoringEnabled = quiz?.proctoring?.enabled ?? true;
+  const isFullscreenRequired = Boolean(quiz?.proctoring?.requiresFullscreen);
+  const allowTabSwitching = Boolean(quiz?.proctoring?.allowTabSwitching);
+  const shouldDetectTabSwitch = proctoringEnabled && !allowTabSwitching;
+
+  const emitProctoringActivity = useCallback((activityType, details = {}) => {
+    if (!submission?._id || !quizId || !user?._id) return;
+
+    socket.emit('activity', {
+      submissionId: submission._id,
+      quizId,
+      activityType,
+      studentId: user._id,
+      institutionId: user.institution || user.institutionId,
+      studentName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.name || 'Unknown Student',
+      studentEmail: user.email || 'No email',
+      details
+    });
+  }, [submission, quizId, user]);
+
+  const registerSuspiciousActivity = (activityType, source = 'general') => {
+    emitProctoringActivity('suspicious_activity', {
+      activityType,
+      source,
+      timestamp: new Date().toISOString()
+    });
+  };
+
+  useEffect(() => {
+    if (!submission?._id || !quizId || !user?._id) return;
+
+    socket.emit('join-quiz', {
+      submissionId: submission._id,
+      quizId,
+      studentId: user._id
+    });
+  }, [submission, quizId, user]);
   
   // Close submit dialog with Escape key
   useEscapeKey(openSubmitDialog, () => setOpenSubmitDialog(false));
@@ -37,6 +141,27 @@ export default function QuizAttempt() {
   // Keyboard navigation for questions and options
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const isClipboardShortcut =
+        (e.ctrlKey || e.metaKey) && ['c', 'x', 'v'].includes(e.key.toLowerCase());
+
+      if (isClipboardShortcut && quiz && submission) {
+        e.preventDefault();
+        registerSuspiciousActivity('Copy/paste shortcut', 'keyboard_shortcut');
+
+        copyPasteRef.current += 1;
+        emitProctoringActivity('clipboard_shortcut_blocked', {
+          key: e.key,
+          count: copyPasteRef.current,
+          reason: 'copy_paste_shortcut_disabled_during_quiz'
+        });
+
+        if (copyPasteRef.current <= MAX_COPY_PASTE_ALERTS) {
+          toast.error(`Copy/paste is disabled (${copyPasteRef.current}/${MAX_COPY_PASTE_ALERTS})`);
+        }
+
+        return;
+      }
+
       // Ignore keyboard shortcuts when in text input
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       
@@ -69,21 +194,55 @@ export default function QuizAttempt() {
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentQuestionIdx, questions, openSubmitDialog]);
+  }, [currentQuestionIdx, questions, openSubmitDialog, quiz, submission, emitProctoringActivity]);
 
   // Load quiz
   useEffect(() => {
     const load = async () => {
+      // Don't load if quizId is not available
+      if (!quizId) {
+        console.error('❌ Cannot load quiz: quizId is undefined');
+        toast.error('Invalid quiz ID. Redirecting to available quizzes...');
+        setTimeout(() => navigate('/available-quizzes'), 2000);
+        return;
+      }
+
       try {
+        setLoading(true);
+        console.log('🎯 Loading quiz with ID:', quizId);
         const data = await getQuizForAttempt(quizId);
+        
+        if (!data) {
+          throw new Error('Failed to load quiz data');
+        }
+        
         setQuiz(data.quiz);
         setSubmission(data.submission);
         setQuestions(data.questions);
         setTimeLeft(data.quiz.duration * 60);
+        
+        // Load existing answers if any
+        if (data.submission.answers && data.submission.answers.length > 0) {
+          const answerMap = {};
+          data.submission.answers.forEach(ans => {
+            answerMap[ans.question] = ans.answer;
+            if (ans.flagged) {
+              setFlagged(prev => new Set([...prev, ans.question]));
+            }
+          });
+          setAnswers(answerMap);
+        }
+        
         setLoading(false);
       } catch (e) {
-        toast.error(e?.response?.data?.message || 'Failed to load quiz');
-        navigate('/student/dashboard');
+        console.error('Quiz load error:', e);
+        const errorMessage = e?.response?.data?.message || e?.message || 'Failed to load quiz';
+        toast.error(errorMessage, { duration: 4000 });
+        
+        // Delay navigation to let user read the error
+        setTimeout(() => {
+          navigate('/student/dashboard');
+        }, 2000);
       }
     };
     load();
@@ -149,6 +308,10 @@ export default function QuizAttempt() {
       if (containerRef.current.requestFullscreen) {
         await containerRef.current.requestFullscreen();
         setIsFullscreen(true);
+        setFullscreenPromptOpen(false);
+        if (isFullscreenRequired) {
+          emitProctoringActivity('fullscreen_enter', { reason: 'mandatory_fullscreen_entered' });
+        }
       }
     } catch (e) {
       toast.error('Could not enter fullscreen');
@@ -156,6 +319,10 @@ export default function QuizAttempt() {
   };
 
   const exitFullscreen = async () => {
+    if (isFullscreenRequired) {
+      toast.error('Fullscreen is mandatory for this quiz');
+      return;
+    }
     if (document.fullscreenElement) {
       await document.exitFullscreen();
       setIsFullscreen(false);
@@ -165,44 +332,179 @@ export default function QuizAttempt() {
   // Fullscreen exit detection
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && isFullscreen) {
+      const currentlyFullscreen = Boolean(document.fullscreenElement);
+
+      if (!currentlyFullscreen && isFullscreen) {
         setIsFullscreen(false);
-        toast.error('⚠️ Fullscreen exited - suspicious activity detected');
+
+        if (isFullscreenRequired) {
+          registerSuspiciousActivity('Fullscreen exit', 'fullscreen_change');
+          toast.error('⚠️ Fullscreen exited - violation reported to faculty');
+          emitProctoringActivity('fullscreen_exit', {
+            reason: 'fullscreen_closed_or_escaped',
+            mandatory: true
+          });
+          setFullscreenPromptOpen(true);
+        }
+      }
+
+      if (currentlyFullscreen && !isFullscreen) {
+        setIsFullscreen(true);
+        if (isFullscreenRequired) {
+          setFullscreenPromptOpen(false);
+        }
       }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [isFullscreen]);
+  }, [isFullscreen, isFullscreenRequired, emitProctoringActivity]);
 
-  // Tab blur detection
   useEffect(() => {
-    const handleBlur = () => {
-      tabBlurRef.current++;
-      if (tabBlurRef.current > 2) {
-        toast.error('⚠️ Multiple tab switches detected - please stay focused');
+    if (isFullscreenRequired && !document.fullscreenElement) {
+      setFullscreenPromptOpen(true);
+    } else {
+      setFullscreenPromptOpen(false);
+    }
+  }, [isFullscreenRequired]);
+
+  // Tab switch detection based on quiz proctoring settings
+  useEffect(() => {
+    if (!quiz || !submission || !shouldDetectTabSwitch) {
+      return;
+    }
+
+    const registerTabSwitch = (source) => {
+      const now = Date.now();
+      if (now - lastTabEventAtRef.current < 800) {
+        return;
+      }
+      lastTabEventAtRef.current = now;
+
+      registerSuspiciousActivity('Tab switch', source);
+
+      tabBlurRef.current += 1;
+      emitProctoringActivity('tab_switch', {
+        reason: source,
+        count: tabBlurRef.current,
+        mandatoryFullscreen: isFullscreenRequired
+      });
+
+      if (tabBlurRef.current <= MAX_TAB_SWITCHES) {
+        toast.error(`Tab switch detected (${tabBlurRef.current}/${MAX_TAB_SWITCHES})`);
+      }
+
+      if (tabBlurRef.current >= MAX_TAB_SWITCHES && !autoSubmitTriggeredRef.current) {
+        autoSubmitTriggeredRef.current = true;
+        toast.error('3 tab switches detected. Quiz is being auto-submitted.');
+        handleAutoSubmit();
+      }
+
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        return;
+      }
+
+      registerTabSwitch('visibility_hidden');
+    };
+
+    const handleWindowBlur = () => {
+      registerTabSwitch('window_blur');
+    };
+
+    const handleTabShortcutAttempt = (e) => {
+      const key = e.key?.toLowerCase();
+      const isSystemSwitchAttempt =
+        key === 'tab' && (e.altKey || e.ctrlKey || e.metaKey);
+
+      if (isSystemSwitchAttempt) {
+        // Browsers cannot fully block OS-level app switching, but we still record and warn.
+        e.preventDefault();
+        registerTabSwitch(`shortcut_${e.altKey ? 'alt' : e.ctrlKey ? 'ctrl' : 'meta'}_tab`);
       }
     };
 
-    const handleFocus = () => {
-      tabBlurRef.current = 0;
-    };
-
-    window.addEventListener('blur', handleBlur);
-    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('keydown', handleTabShortcutAttempt, true);
 
     return () => {
-      window.removeEventListener('blur', handleBlur);
-      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('keydown', handleTabShortcutAttempt, true);
     };
-  }, []);
+  }, [quiz, submission, shouldDetectTabSwitch, emitProctoringActivity, isFullscreenRequired]);
+
+  // Disable copy, paste and cut while quiz is active
+  useEffect(() => {
+    if (!quiz || !submission) {
+      return;
+    }
+
+    const handleClipboard = (e) => {
+      e.preventDefault();
+
+      copyPasteRef.current += 1;
+
+      emitProctoringActivity('clipboard_blocked', {
+        type: e.type,
+        count: copyPasteRef.current,
+        reason: 'clipboard_disabled_during_quiz'
+      });
+
+      registerSuspiciousActivity('Copy/paste attempt', e.type);
+
+      if (copyPasteRef.current <= MAX_COPY_PASTE_ALERTS) {
+        toast.error(`Copy/paste is disabled (${copyPasteRef.current}/${MAX_COPY_PASTE_ALERTS})`);
+      }
+    };
+
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      emitProctoringActivity('right_click_blocked', { reason: 'context_menu_disabled' });
+      registerSuspiciousActivity('Right-click', 'context_menu');
+    };
+
+    document.addEventListener('copy', handleClipboard);
+    document.addEventListener('paste', handleClipboard);
+    document.addEventListener('cut', handleClipboard);
+    document.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      document.removeEventListener('copy', handleClipboard);
+      document.removeEventListener('paste', handleClipboard);
+      document.removeEventListener('cut', handleClipboard);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, [quiz, submission, emitProctoringActivity]);
+
+  // Window close/refresh attempt detection
+  useEffect(() => {
+    if (!quiz || !submission) {
+      return;
+    }
+
+    const handleBeforeUnload = (e) => {
+      registerSuspiciousActivity('Window close/refresh attempt', 'beforeunload');
+      emitProctoringActivity('window_close_attempt', { reason: 'before_unload' });
+      e.preventDefault();
+      e.returnValue = 'Leaving will be treated as suspicious activity.';
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [quiz, submission, emitProctoringActivity]);
 
   // Auto-submit on time expiry
   const handleAutoSubmit = async () => {
+    if (submitting) return;
+
     setSubmitting(true);
     try {
       await submitQuiz(quizId);
-      toast.success('Quiz auto-submitted due to time expiry');
+      toast.success('Quiz auto-submitted');
       navigate('/student/dashboard');
     } catch (e) {
       toast.error('Auto-submit failed');
@@ -226,7 +528,11 @@ export default function QuizAttempt() {
     }
   };
 
-  if (loading) return <Box sx={{ p: 3 }}><Typography>Loading quiz...</Typography></Box>;
+  if (loading) return (
+    <Box sx={{ p: 3, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <AnimatedLoader message="Loading quiz" size="large" />
+    </Box>
+  );
   if (!quiz || questions.length === 0) return <Box sx={{ p: 3 }}><Typography>Quiz not found</Typography></Box>;
 
   const currentQuestion = questions[currentQuestionIdx];
@@ -411,6 +717,28 @@ export default function QuizAttempt() {
           <Button onClick={() => setOpenSubmitDialog(false)}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" color="success" disabled={submitting}>
             {submitting ? 'Submitting...' : 'Confirm Submit'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Mandatory Fullscreen Dialog */}
+      <Dialog
+        open={fullscreenPromptOpen}
+        onClose={() => {}}
+        disableEscapeKeyDown
+      >
+        <DialogTitle>Fullscreen Required</DialogTitle>
+        <DialogContent>
+          <Typography>
+            This quiz requires fullscreen mode. Please enter fullscreen to continue your attempt.
+          </Typography>
+          <Typography sx={{ mt: 1, color: 'error.main', fontWeight: 600 }}>
+            Exiting fullscreen is reported instantly to faculty monitoring.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={enterFullscreen} variant="contained" color="primary">
+            Enter Fullscreen
           </Button>
         </DialogActions>
       </Dialog>

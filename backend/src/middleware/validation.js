@@ -36,8 +36,23 @@ export const validateUserLogin = [
 
 // Create Quiz Validation
 export const validateQuizCreation = [
-  body('title').trim().notEmpty().withMessage('Quiz title is required').isLength({ min: 3 }).withMessage('Title must be at least 3 characters'),
-  body('duration').isInt({ min: 1 }).withMessage('Duration must be a positive integer'),
-  body('totalMarks').isInt({ min: 0 }).withMessage('Total marks must be a non-negative integer'),
+  body('title')
+    .trim()
+    .notEmpty().withMessage('Quiz title is required')
+    .isLength({ min: 3 }).withMessage('Title must be at least 3 characters'),
+  
+  body('duration')
+    .toInt()
+    .isInt({ min: 1 }).withMessage('Duration must be a positive integer (in minutes)'),
+  
+  body('totalMarks')
+    .toInt()
+    .isInt({ min: 1 }).withMessage('Total marks must be at least 1'),
+  
+  body('passingMarks')
+    .optional({ checkFalsy: false })
+    .toInt()
+    .isInt({ min: 0 }).withMessage('Passing marks must be a non-negative integer'),
+  
   handleValidationErrors
 ];

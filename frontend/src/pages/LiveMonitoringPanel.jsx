@@ -295,6 +295,16 @@ export default function LiveMonitoringPanel() {
                       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                         {alert.alertType || 'Activity Alert'}
                       </Typography>
+                      {(alert.studentName || alert.studentEmail) && (
+                        <Typography variant="caption" sx={{ display: 'block', fontWeight: 500 }}>
+                          Student: {alert.studentName || '-'} {alert.studentEmail ? `(${alert.studentEmail})` : ''}
+                        </Typography>
+                      )}
+                      {alert.message && (
+                        <Typography variant="caption" sx={{ display: 'block' }}>
+                          {alert.message}
+                        </Typography>
+                      )}
                       <Typography variant="caption">
                         {alert.activity} - Risk: {alert.score}%
                       </Typography>

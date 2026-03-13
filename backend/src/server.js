@@ -4,15 +4,35 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { connectDB } from './config/database.js';
 import { globalErrorHandler } from './utils/errorHandler.js';
+import { verifyEmailConfig, startEmailQueueProcessor } from './utils/emailService.js';
 import authRoutes from './routes/authRoutes.js';
 import quizRoutes from './routes/quizRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import institutionRoutes from './routes/institutionRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import { initSocket } from './sockets/quizSocket.js';
 
-dotenv.config();
+// Load environment variables from .env file
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const envPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath });
+
+// Verify critical env variables are loaded
+if (!process.env.JWT_SECRET) {
+  console.error('❌ CRITICAL: JWT_SECRET is not set in .env file');
+  process.exit(1);
+}
+if (!process.env.REFRESH_TOKEN_SECRET) {
+  console.error('❌ CRITICAL: REFRESH_TOKEN_SECRET is not set in .env file');
+  process.exit(1);
+}
+console.log('✅ Environment variables loaded successfully');
 
 // Initialize Express app
 const app = express();
@@ -44,9 +64,11 @@ app.set('io', io);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/auth', userRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/institutions', institutionRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 
 // Health Check
 app.get('/api/health', (req, res) => {
@@ -72,16 +94,21 @@ app.use(globalErrorHandler);
 const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   try {
-    // Connect to MongoDB (non-blocking)
-    connectDB().catch(err => {
-      console.warn('⚠️ MongoDB connection failed, but server will continue:', err.message);
-    });
+    // Connect to MongoDB before accepting requests to avoid buffered timeouts
+    await connectDB();
+
+    // Verify email configuration
+    await verifyEmailConfig();
+// Start email queue processor (checks every 60 seconds for scheduled emails)
+    startEmailQueueProcessor(60000);
 
     server.listen(PORT, () => {
       console.log(`
 ╔════════════════════════════════════════╗
 ║   🎓 Proctolearn Server Started        ║
 ║   📍 http://localhost:${PORT}           ║
+║   🔗 WebSocket: ws://localhost:${PORT}  ║
+║   📧 Email Queue: Initialized          ║
 ║   🔗 WebSocket: ws://localhost:${PORT}  ║
 ╚════════════════════════════════════════╝
       `);

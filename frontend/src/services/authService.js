@@ -1,4 +1,6 @@
 import apiClient from './api.js';
+import { auth, googleProvider } from '../config/firebaseConfig';
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 
 // Register
 export const registerUser = async (userData) => {
@@ -72,4 +74,30 @@ export const refreshAccessToken = async (refreshToken) => {
     localStorage.setItem('token', response.data.data.token);
   }
   return response.data;
+};
+
+// ==================== OAuth Functions ====================
+
+/**
+ * Firebase Google Sign-In with Popup
+ */
+export const signInWithGoogle = async () => {
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const credential = GoogleAuthProvider.credentialFromResult(result);
+    const idToken = credential?.idToken || null;
+    const accessToken = credential?.accessToken || null;
+    console.log('✅ Firebase Google Sign-In successful', result.user);
+    return { idToken, accessToken, user: result.user };
+  } catch (error) {
+    console.error('Firebase Google Sign-In Error:', error);
+    throw error;
+  }
+};
+
+/**
+ * Microsoft Sign-In (not configured yet)
+ */
+export const signInWithMicrosoft = async () => {
+  throw new Error('Microsoft Sign-In not configured. Please set up Azure AD.');
 };

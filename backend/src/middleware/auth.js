@@ -38,14 +38,23 @@ export const checkRole = (...allowedRoles) => {
       const User = (await import('../models/User.js')).default;
       const user = await User.findById(req.userId);
 
-      if (!user || !allowedRoles.includes(user.role)) {
+      if (!user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
+      if (!allowedRoles.includes(user.role)) {
+        const roleNames = allowedRoles.join(' or ');
         return res.status(HTTP_STATUS.FORBIDDEN).json({
           success: false,
-          message: 'Insufficient permissions'
+          message: `Access denied. This action requires ${roleNames} role. Your current role is: ${user.role}`
         });
       }
 
       req.user = user;
+      req.userRole = user.role;
       next();
     } catch (error) {
       return res.status(HTTP_STATUS.INTERNAL_ERROR).json({

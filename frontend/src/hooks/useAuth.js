@@ -6,8 +6,9 @@ export const useAuth = () => {
   const { user, token, isAuthenticated, initializeFromLocalStorage } = useAuthStore();
 
   useEffect(() => {
+    // Initialize auth from localStorage on mount
     initializeFromLocalStorage();
-  }, [initializeFromLocalStorage]);
+  }, []); // Empty dependency array - only run once on mount
 
   return {
     user,

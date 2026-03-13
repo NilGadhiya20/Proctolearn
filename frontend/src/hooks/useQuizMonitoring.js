@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import {
   logActivity,
   triggerAutoSubmit,
-  getSocket,
   emitFullscreenExit,
   emitQuizLeft,
   emitTabSwitch,
@@ -17,10 +16,21 @@ export const useQuizMonitoring = (
   institutionId,
   options = {}
 ) => {
-  const tabChangeCount = useRef(0);
   const isFullscreen = useRef(false);
   const violationCount = useRef(0);
-  const { violationLimit = 3, onAutoSubmit } = options || {};
+  const { 
+    violationLimit = 3, 
+    onAutoSubmit,
+    onTimerUpdate: onLocalTimerUpdate,
+    proctoringSettings = {}
+  } = options || {};
+  
+  const {
+    enabled: proctoringEnabled = true,
+    allowTabSwitching = false,
+    requiresFullscreen = true,
+    allowCopyPaste = false
+  } = proctoringSettings;
 
   const incrementViolation = (reason) => {
     violationCount.current += 1;
@@ -56,9 +66,14 @@ export const useQuizMonitoring = (
       }
     }
   };
+
   useEffect(() => {
+    if (!submissionId || !quizId || !studentId || !proctoringEnabled) {
+      return;
+    }
+
     const handleVisibilityChange = () => {
-      if (document.hidden) {
+      if (document.hidden && !allowTabSwitching) {
         logActivity(
           submissionId,
           quizId,
@@ -88,7 +103,9 @@ export const useQuizMonitoring = (
 
         emitFullscreenExit({ submissionId, quizId, studentId, institutionId });
 
-        incrementViolation('fullscreen_exit');
+        if (requiresFullscreen) {
+          incrementViolation('fullscreen_exit');
+        }
       }
       isFullscreen.current = !!fullscreenElement;
     };
@@ -98,7 +115,15 @@ export const useQuizMonitoring = (
         (e.ctrlKey || e.metaKey) &&
         ['c', 'x', 'v', 'a', 's', 'p'].includes(e.key.toLowerCase());
 
-      if (isSuspiciousShortcut) {
+      if (!isSuspiciousShortcut) {
+        return;
+      }
+
+      if (!allowCopyPaste || ['a', 's', 'p'].includes(e.key.toLowerCase())) {
+        if (!allowCopyPaste && ['c', 'x', 'v'].includes(e.key.toLowerCase())) {
+          e.preventDefault();
+        }
+
         logActivity(
           submissionId,
           quizId,
@@ -113,6 +138,10 @@ export const useQuizMonitoring = (
     };
 
     const handleWindowBlur = () => {
+      if (allowTabSwitching) {
+        return;
+      }
+
       logActivity(
         submissionId,
         quizId,
@@ -140,30 +169,43 @@ export const useQuizMonitoring = (
     };
 
     const handleClipboard = (e) => {
-      e.preventDefault();
       const type = e.type || 'clipboard';
+
+      if (!allowCopyPaste) {
+        e.preventDefault();
+      }
+
       logActivity(
         submissionId,
         quizId,
         type,
-        { type },
+        { type, prevented: !allowCopyPaste },
         studentId,
         institutionId
       );
-      incrementViolation(type);
+
+      if (!allowCopyPaste) {
+        incrementViolation(type);
+      }
     };
 
     const handleSelectStart = (e) => {
-      e.preventDefault();
+      if (!allowCopyPaste) {
+        e.preventDefault();
+      }
+
       logActivity(
         submissionId,
         quizId,
         'select_start',
-        {},
+        { prevented: !allowCopyPaste },
         studentId,
         institutionId
       );
-      incrementViolation('select_start');
+
+      if (!allowCopyPaste) {
+        incrementViolation('select_start');
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -178,8 +220,8 @@ export const useQuizMonitoring = (
 
     const handleTimerUpdate = (payload = {}) => {
       const remainingSeconds = payload.remainingSeconds ?? payload.remaining ?? null;
-      if (typeof options.onTimerUpdate === 'function') {
-        options.onTimerUpdate(payload);
+      if (typeof onLocalTimerUpdate === 'function') {
+        onLocalTimerUpdate(payload);
       }
       if (remainingSeconds !== null && remainingSeconds <= 0) {
         triggerAutoSubmit({ submissionId, quizId, studentId, reason: 'time_expired' });
@@ -190,7 +232,7 @@ export const useQuizMonitoring = (
     };
 
     onTimerUpdate(handleTimerUpdate);
-
+    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -203,7 +245,19 @@ export const useQuizMonitoring = (
       document.removeEventListener('selectstart', handleSelectStart);
       offTimerUpdate(handleTimerUpdate);
     };
-  }, [submissionId, quizId, studentId, institutionId, violationLimit, onAutoSubmit]);
+  }, [
+    submissionId,
+    quizId,
+    studentId,
+    institutionId,
+    proctoringEnabled,
+    allowTabSwitching,
+    allowCopyPaste,
+    requiresFullscreen,
+    violationLimit,
+    onAutoSubmit,
+    onLocalTimerUpdate
+  ]);
 
   const enterFullscreen = async () => {
     try {

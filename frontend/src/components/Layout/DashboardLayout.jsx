@@ -100,7 +100,7 @@ const DashboardLayout = ({
 
       {/* Keyboard Navigation Hint */}
       {sidebarOpen && isMobile && (
-        <div className="fixed bottom-4 right-4 z-[70] bg-white rounded-xl px-3 py-2 shadow-lg border border-slate-200 text-xs text-slate-600">
+        <div className="fixed bottom-4 right-4 z-[70] bg-white rounded-xl px-3 py-2 shadow-lg border border-slate-200 text-xs text-black">
           <span>Press ESC to close</span>
         </div>
       )}

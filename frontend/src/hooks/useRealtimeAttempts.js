@@ -46,19 +46,40 @@ export const useRealtimeAttempts = (quizId, enabled = true) => {
     newSocket.on('alert', (data) => {
       console.log('Alert received:', data);
       setAlerts(prev => [data, ...prev].slice(0, 20)); // Keep last 20 alerts
+      const mappedRisk = data.severity === 'critical' ? 'critical' : data.severity === 'high' ? 'warning' : 'normal';
       
       // Update submission risk
       setSubmissions(prev => prev.map(sub => {
         if (sub._id === data.submissionId) {
           return {
             ...sub,
-            riskLevel: data.severity,
+            riskLevel: mappedRisk,
             suspicionScore: data.score,
             lastAlert: new Date()
           };
         }
         return sub;
       }));
+    });
+
+    newSocket.on('tabSwitchDetected', (data) => {
+      setAlerts(prev => [{
+        ...data,
+        alertType: 'TAB_SWITCH',
+        severity: 'high',
+        score: 80,
+        message: data.message || 'Tab switch detected'
+      }, ...prev].slice(0, 20));
+    });
+
+    newSocket.on('fullscreenExitDetected', (data) => {
+      setAlerts(prev => [{
+        ...data,
+        alertType: 'FULLSCREEN_EXIT',
+        severity: 'critical',
+        score: 100,
+        message: data.message || 'Fullscreen exit detected'
+      }, ...prev].slice(0, 20));
     });
 
     newSocket.on('dashboard-activity', (data) => {
@@ -68,6 +89,11 @@ export const useRealtimeAttempts = (quizId, enabled = true) => {
     setSocket(newSocket);
 
     return () => {
+      newSocket.off('activity-logged');
+      newSocket.off('alert');
+      newSocket.off('dashboard-activity');
+      newSocket.off('tabSwitchDetected');
+      newSocket.off('fullscreenExitDetected');
       newSocket.disconnect();
     };
   }, [quizId, enabled]);

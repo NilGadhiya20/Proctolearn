@@ -86,7 +86,7 @@ const LandingNavbar = ({ scrollToSection }) => {
                     to={link.to} 
                     className={`
                       nav-link flex items-center gap-1.5 
-                      text-emerald-700 hover:text-emerald-800
+                      text-black hover:text-emerald-800
                       font-bold py-2 px-2 hover:scale-110 transition-all duration-300
                     `}
                   >
@@ -99,7 +99,7 @@ const LandingNavbar = ({ scrollToSection }) => {
                     onClick={link.onClick}
                     className={`
                       nav-link flex items-center gap-1.5 
-                      text-emerald-700 hover:text-emerald-800
+                      text-black hover:text-emerald-800
                       font-bold py-2 px-2 hover:scale-110 transition-all duration-300
                     `}
                   >
@@ -119,7 +119,7 @@ const LandingNavbar = ({ scrollToSection }) => {
                     to="/login"
                     className={`
                       flex items-center gap-1.5 
-                      text-emerald-700 hover:text-white hover:bg-gradient-to-r hover:from-emerald-500 hover:to-lime-500
+                      text-black hover:text-white hover:bg-gradient-to-r hover:from-emerald-500 hover:to-lime-500
                       font-bold px-3 lg:px-6 py-2 lg:py-3 rounded-xl 
                       hover:shadow-lg hover:scale-105 transition-all duration-300 
                       border-2 border-transparent hover:border-emerald-400
@@ -140,10 +140,10 @@ const LandingNavbar = ({ scrollToSection }) => {
                 </>
               ) : (
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <span className="text-slate-600 font-medium hidden md:inline text-sm lg:text-base">
+                  <span className="text-black font-medium hidden md:inline text-sm lg:text-base">
                     Hi, {user.firstName}
                   </span>
-                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-100 text-emerald-700 border-white flex items-center justify-center font-bold border-2 shadow-sm text-sm sm:text-base">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-100 text-black border-white flex items-center justify-center font-bold border-2 shadow-sm text-sm sm:text-base">
                     {user.firstName?.[0]}
                   </div>
                 </div>
@@ -161,7 +161,7 @@ const LandingNavbar = ({ scrollToSection }) => {
             <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-2xl flex items-center justify-center shadow-lg">
               <GraduationCap className="text-white w-7 h-7" />
             </div>
-            <span className="text-2xl font-bold text-emerald-600">
+            <span className="text-2xl font-bold text-black">
               Proctolearn
             </span>
           </div>
@@ -177,7 +177,7 @@ const LandingNavbar = ({ scrollToSection }) => {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`
                     flex items-center gap-3 p-3 rounded-xl
-                    text-slate-700 hover:bg-emerald-50 hover:text-emerald-700
+                    text-black hover:bg-emerald-50 hover:text-emerald-700
                     font-semibold transition-all duration-200
                     border border-transparent hover:border-emerald-200
                   `}
@@ -191,7 +191,7 @@ const LandingNavbar = ({ scrollToSection }) => {
                   onClick={link.onClick}
                   className={`
                     w-full flex items-center gap-3 p-3 rounded-xl
-                    text-slate-700 hover:bg-emerald-50 hover:text-emerald-700
+                    text-black hover:bg-emerald-50 hover:text-emerald-700
                     font-semibold transition-all duration-200
                     border border-transparent hover:border-emerald-200
                   `}

@@ -38,6 +38,7 @@ const Sidebar = ({ open, onClose }) => {
       admin: [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/admin/dashboard' },
         { icon: Users, label: 'Manage Users', path: '/manage-users' },
+        { icon: Users, label: 'View Students', path: '/students' },
         { icon: FileText, label: 'Create Quiz', path: '/create-quiz' },
         { icon: BarChart3, label: 'View Reports', path: '/view-reports' },
         { icon: Eye, label: 'Monitor Sessions', path: '/monitor-sessions' },

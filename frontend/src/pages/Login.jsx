@@ -1,15 +1,16 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import apiClient from '../services/api';
 import { useAuthStore } from '../context/store';
-import { signInWithGoogle, completeSupabaseOAuth } from '../config/firebaseConfig';
+import { signInWithGoogle } from '../services/authService';
 import Reveal from '../components/Reveal';
 import MotionImage from '../components/MotionImage';
 import AuthLoader from '../components/Common/AuthLoader';
 import AuthNavbar from '../components/Common/AuthNavbar';
 import AuthFooter from '../components/Common/AuthFooter';
+import ForgotPasswordModal from '../components/Dialogs/ForgotPasswordModal';
 import { useTabNavigation } from '../hooks/useKeyboardNavigation';
 import { KEYS } from '../utils/keyboardNavigation';
 
@@ -17,6 +18,8 @@ export default function Login() {
   console.log('🔵 Login Component Loaded');
   
   const [activeTab, setActiveTab] = useState('student');
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [selectedRole, setSelectedRole] = useState('student');
   const [formData, setFormData] = useState({
     studentEmail: '',
     studentPassword: '',
@@ -97,72 +100,6 @@ export default function Login() {
     }
   };
 
-  useEffect(() => {
-    const handleSupabaseCallback = async () => {
-      const hasOAuthParams =
-        window.location.hash.includes('access_token') ||
-        window.location.hash.includes('refresh_token') ||
-        window.location.search.includes('code=');
-
-      if (!hasOAuthParams) return;
-
-      // Check if we're in a popup window
-      if (window.opener) {
-        console.log('🔵 OAuth callback detected in popup, processing...');
-        await completeSupabaseOAuth(); // This will handle sending message to parent
-        return;
-      }
-
-      // Handle non-popup OAuth callback (fallback for direct navigation)
-      setLoading(true);
-
-      try {
-        const session = await completeSupabaseOAuth();
-
-        if (!session?.provider_token) {
-          throw new Error('Google provider token not returned from Supabase.');
-        }
-
-        const response = await apiClient.post('/auth/google', {
-          accessToken: session.provider_token,
-          institutionCode: 'PPSU'
-        });
-
-        if (response.data.success) {
-          const userData = response.data.data.user;
-          const token = response.data.data.token;
-
-          setToken(token);
-          setUser(userData);
-          localStorage.setItem('token', token);
-          localStorage.setItem('user', JSON.stringify(userData));
-
-          const role = userData.role?.toLowerCase();
-          if (role === 'admin') {
-            navigate('/admin/dashboard');
-          } else if (role === 'faculty') {
-            navigate('/faculty/dashboard');
-          } else {
-            navigate('/student/dashboard');
-          }
-        } else {
-          toast.error(response.data.message || 'Google login failed.');
-        }
-      } catch (callbackError) {
-        console.error('Supabase OAuth callback error:', callbackError);
-        toast.error(
-          callbackError.response?.data?.message ||
-            callbackError.message ||
-            'Google login failed.'
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    handleSupabaseCallback();
-  }, [navigate, setToken, setUser]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -204,7 +141,8 @@ export default function Login() {
 
       const payload = {
         email,
-        password
+        password,
+        role // Send the role with login request
       };
 
       if (role === 'admin') {
@@ -242,12 +180,12 @@ export default function Login() {
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error('❌ Login error:', error);
+      console.error('Login error:', error);
       
       let errorMsg = 'Login failed. Please check your credentials.';
       
       if (error.message === 'Network Error') {
-        errorMsg = '❌ Unable to connect to server. Please try again later.';
+        errorMsg = 'Unable to connect to server. Please try again later.';
       } else if (error.response?.status === 401) {
         // Handle 401 specifically - invalid credentials
         const backendMsg = error.response?.data?.message || '';
@@ -255,18 +193,20 @@ export default function Login() {
             backendMsg.toLowerCase().includes('incorrect') ||
             backendMsg.toLowerCase().includes('password') ||
             backendMsg.toLowerCase().includes('email')) {
-          errorMsg = '❌ Invalid email or password. Please try again.';
+          errorMsg = 'Invalid email or password. Please try again.';
         } else if (role === 'admin' && backendMsg.toLowerCase().includes('code')) {
-          errorMsg = '❌ Invalid admin code. Please check and try again.';
+          errorMsg = 'Invalid admin code. Please check and try again.';
         } else {
-          errorMsg = '❌ ' + backendMsg;
+          errorMsg = backendMsg;
         }
-      } else if (error.response?.status === 404) {
-        errorMsg = '❌ Account not found. Please sign up first.';
       } else if (error.response?.status === 403) {
-        errorMsg = '❌ Access denied. Please contact support.';
+        // Handle 403 specifically - role mismatch
+        const backendMsg = error.response?.data?.message || '';
+        errorMsg = backendMsg;
+      } else if (error.response?.status === 404) {
+        errorMsg = 'Account not found. Please sign up first.';
       } else if (error.response?.data?.message) {
-        errorMsg = '❌ ' + error.response.data.message;
+        errorMsg = error.response.data.message;
       }
       
       toast.error(errorMsg, {
@@ -290,18 +230,19 @@ export default function Login() {
         console.log('🔵 Starting Google popup login...');
         
         // Call the popup-style Google OAuth
-        const result = await signInWithGoogle('PPSU');
-        
-        if (!result?.session?.provider_token) {
-          throw new Error('Google provider token not returned from Supabase.');
+        const result = await signInWithGoogle();
+
+        if (!result?.idToken && !result?.accessToken) {
+          throw new Error('Google token not returned from Firebase.');
         }
 
         console.log('✅ Google OAuth successful, authenticating with backend...');
 
-        // Send the provider token to your backend
+        // Send the token(s) to your backend
         const response = await apiClient.post('/auth/google', {
-          accessToken: result.session.provider_token,
-          institutionCode: result.institutionCode || 'PPSU'
+          idToken: result.idToken || undefined,
+          accessToken: result.accessToken || undefined,
+          institutionCode: 'PPSU'
         });
 
         if (response.data.success) {
@@ -354,39 +295,13 @@ export default function Login() {
     }
   };
 
-  const handleForgotPassword = async (email, role) => {
+  const handleForgotPassword = (email, role) => {
     if (!email) {
       toast.error('Please enter your email first');
       return;
     }
-
-    setLoading(true);
-    
-    try {
-      const response = await apiClient.post('/auth/verify-email', { 
-        email,
-        role
-      });
-
-      if (response.data.success && response.data.data.exists) {
-        toast.success('✓ Password reset link sent to your email!');
-        // In future: navigate to password reset page or show reset form
-      } else {
-        toast.error('❌ Email not registered. Please sign up first.');
-      }
-    } catch (error) {
-      console.error('Verify email error:', error);
-      
-      if (error.response?.status === 404 || !error.response?.data?.data?.exists) {
-        toast.error('❌ This email is not registered. Please sign up first.');
-      } else if (error.response?.status === 401) {
-        toast.error(`❌ This email is not registered as a ${role}. Please check your role.`);
-      } else {
-        toast.error(error.response?.data?.message || 'Unable to verify email. Please try again.');
-      }
-    } finally {
-      setLoading(false);
-    }
+    setSelectedRole(role);
+    setForgotPasswordOpen(true);
   };
 
   return (
@@ -609,7 +524,7 @@ export default function Login() {
                     <button
                       onClick={() => handleSocialLogin('Google')}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 sm:gap-3 py-2.5 sm:py-3 border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl hover:bg-teal-50 transition-all transform hover:scale-[1.02] active:scale-95 text-xs sm:text-sm md:text-base font-semibold text-slate-700 hover:border-teal-400 hover:shadow-lg disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 sm:gap-3 py-2.5 sm:py-3 border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-[0_10px_25px_rgba(20,184,166,0.2)] hover:bg-teal-50/80 hover:border-teal-500 active:scale-95 text-xs sm:text-sm md:text-base font-semibold text-slate-700 disabled:opacity-50"
                     >
                       <MotionImage
                         src="https://www.svgrepo.com/show/475656/google-color.svg"
@@ -641,7 +556,7 @@ export default function Login() {
                           id="studentEmail"
                           name="studentEmail"
                           type="email" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 transition font-medium text-sm sm:text-base"
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-sm sm:text-base"
                           placeholder="student@proctolearn.edu"
                           value={formData.studentEmail}
                           onChange={handleInputChange}
@@ -656,8 +571,8 @@ export default function Login() {
                           type="button"
                           onClick={() => handleForgotPassword(formData.studentEmail, 'student')}
                           disabled={loading}
-                          className="text-[10px] sm:text-xs text-teal-600 hover:text-teal-700 font-semibold hover:underline disabled:opacity-50"
-                        >
+                          className="text-[10px] sm:text-xs text-teal-600 hover:text-teal-700 font-semibold relative group disabled:opacity-50"
+                        ><span className="absolute bottom-0 left-0 w-0 bg-teal-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                           Forgot password?
                         </button>
                       </div>
@@ -669,7 +584,7 @@ export default function Login() {
                           id="studentPassword"
                           name="studentPassword"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 transition font-medium text-sm sm:text-base"
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-sm sm:text-base"
                           value={formData.studentPassword}
                           onChange={handleInputChange}
                         />
@@ -679,7 +594,7 @@ export default function Login() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-teal-700 to-teal-500 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-teal-800 hover:to-teal-600 transition shadow-lg shadow-teal-700/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                      className="w-full bg-gradient-to-r from-teal-700 to-teal-500 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-teal-800 hover:to-teal-600 transition-all duration-300 shadow-lg shadow-teal-700/30 hover:shadow-[0_15px_40px_rgba(20,184,166,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
@@ -689,12 +604,12 @@ export default function Login() {
                   </form>
 
                   <p className="mt-3 sm:mt-4 text-[10px] sm:text-xs text-slate-400 text-center">
-                    By continuing you agree to our <a href="#" className="text-teal-600 hover:underline">Terms & Privacy Policy</a>
+                    By continuing you agree to our <a href="#" className="text-teal-600 hover:text-teal-700 relative group">Terms & Privacy Policy<span className="absolute bottom-0 left-0 w-0 bg-teal-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span></a>
                   </p>
 
                   <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-slate-500 text-center">
                     Don't have an account?{' '}
-                    <Link to="/register" className="text-teal-600 hover:text-teal-700 font-bold hover:underline">
+                    <Link to="/register" className="text-teal-600 hover:text-teal-700 font-bold relative group">
                       Sign Up Here
                     </Link>
                   </p>
@@ -718,7 +633,7 @@ export default function Login() {
                     <button
                       onClick={() => handleSocialLogin('Google')}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-2 sm:gap-3 py-2.5 sm:py-3 border border-green-200 sm:border-2 rounded-lg sm:rounded-xl hover:bg-green-50 transition-all transform hover:scale-[1.02] active:scale-95 text-xs sm:text-sm md:text-base font-semibold text-slate-700 hover:border-green-400 hover:shadow-lg disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 sm:gap-3 py-2.5 sm:py-3 border border-green-200 sm:border-2 rounded-lg sm:rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-[0_10px_25px_rgba(34,197,94,0.2)] hover:bg-green-50/80 hover:border-green-500 active:scale-95 text-xs sm:text-sm md:text-base font-semibold text-slate-700 disabled:opacity-50"
                     >
                       <MotionImage
                         src="https://www.svgrepo.com/show/475656/google-color.svg"
@@ -749,7 +664,7 @@ export default function Login() {
                           id="facultyEmail"
                           name="facultyEmail"
                           type="email" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 transition font-medium text-sm sm:text-base" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-sm sm:text-base" 
                           placeholder="faculty@proctolearn.edu"
                           value={formData.facultyEmail}
                           onChange={handleInputChange}
@@ -764,8 +679,8 @@ export default function Login() {
                           type="button"
                           onClick={() => handleForgotPassword(formData.facultyEmail, 'faculty')}
                           disabled={loading}
-                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold hover:underline disabled:opacity-50"
-                        >
+                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold relative group disabled:opacity-50"
+                        ><span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                           Forgot password?
                         </button>
                       </div>
@@ -777,7 +692,7 @@ export default function Login() {
                           id="facultyPassword"
                           name="facultyPassword"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 transition font-medium text-sm sm:text-base" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-sm sm:text-base" 
                           value={formData.facultyPassword}
                           onChange={handleInputChange}
                         />
@@ -787,7 +702,7 @@ export default function Login() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-green-700 to-teal-600 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-teal-700 transition shadow-lg shadow-green-700/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                      className="w-full bg-gradient-to-r from-green-700 to-teal-600 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-teal-700 transition-all duration-300 shadow-lg shadow-green-700/30 hover:shadow-[0_15px_40px_rgba(34,197,94,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
@@ -797,13 +712,13 @@ export default function Login() {
                   </form>
 
                   <p className="mt-3 sm:mt-4 text-[10px] sm:text-xs text-slate-400 text-center">
-                    By continuing you agree to our <a href="#" className="text-green-600 hover:underline">Terms & Privacy Policy</a>
+                    By continuing you agree to our <a href="#" className="text-green-600 hover:text-green-700 relative group">Terms & Privacy Policy<span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span></a>
                   </p>
 
                   <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-slate-500 text-center">
                     Don't have an account?{' '}
-                    <Link to="/register" className="text-green-600 hover:text-green-700 font-bold hover:underline">
-                      Sign Up Here
+                    <Link to="/register" className="text-green-600 hover:text-green-700 font-bold relative group">
+                      Sign Up Here<span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                     </Link>
                   </p>
                 </motion.div>
@@ -897,13 +812,13 @@ export default function Login() {
                   </form>
 
                   <p className="mt-3 sm:mt-4 text-[10px] sm:text-xs text-slate-400 text-center">
-                    By continuing you agree to our <a href="#" className="text-green-600 hover:underline">Terms & Privacy Policy</a>
+                    By continuing you agree to our <a href="#" className="text-green-600 hover:text-green-700 relative group">Terms & Privacy Policy<span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span></a>
                   </p>
 
                   <p className="mt-2 sm:mt-3 text-[10px] sm:text-xs text-slate-500 text-center">
                     Don't have an account?{' '}
-                    <Link to="/register" className="text-green-600 hover:text-green-700 font-bold hover:underline">
-                      Sign Up Here
+                    <Link to="/register" className="text-green-600 hover:text-green-700 font-bold relative group">
+                      Sign Up Here<span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                     </Link>
                   </p>
                 </motion.div>
@@ -935,6 +850,13 @@ export default function Login() {
           }
         `}</style>
       </motion.section>
+
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal 
+        open={forgotPasswordOpen}
+        onClose={() => setForgotPasswordOpen(false)}
+        userRole={selectedRole}
+      />
 
       {/* Footer */}
       <AuthFooter />

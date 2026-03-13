@@ -28,26 +28,64 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AddIcon from '@mui/icons-material/Add';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import EditIcon from '@mui/icons-material/Edit';
+import AnimatedLoader from '../components/Common/AnimatedLoader';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PublishIcon from '@mui/icons-material/Publish';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import QuizIcon from '@mui/icons-material/Quiz';
 import toast from 'react-hot-toast';
-import { getAllQuizzes, deleteQuiz, publishQuiz } from '../services/quizService';
+import { getAllQuizzes, deleteQuiz, publishQuiz, toggleQuizStatus } from '../services/quizService';
+import { useAuthStore } from '../context/store';
+import socket from '../socket';
 
 const MyQuizzes = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+  const { user } = useAuthStore();
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedQuiz, setSelectedQuiz] = useState(null);
   const [viewDialog, setViewDialog] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmText: 'Confirm',
+    confirmColor: 'primary',
+    onConfirm: null
+  });
+
+  const isFacultyOrAdmin = user && (user.role === 'faculty' || user.role === 'admin');
 
   useEffect(() => {
     fetchQuizzes();
+
+    // Listen for real-time quiz updates
+    socket.on('quiz-updated', (data) => {
+      console.log('Quiz updated:', data);
+      // Refresh the quiz list
+      fetchQuizzes();
+      toast.success('Quiz list updated');
+    });
+
+    socket.on('quiz-status-changed', (data) => {
+      console.log('Quiz status changed:', data);
+      // Update the specific quiz in the list
+      setQuizzes(prevQuizzes => 
+        prevQuizzes.map(quiz => 
+          quiz._id === data.quizId ? { ...quiz, status: data.newStatus } : quiz
+        )
+      );
+    });
+
+    // Cleanup listeners on unmount
+    return () => {
+      socket.off('quiz-updated');
+      socket.off('quiz-status-changed');
+    };
   }, []);
 
   const fetchQuizzes = async () => {
@@ -74,28 +112,84 @@ const MyQuizzes = () => {
     setAnchorEl(null);
   };
 
-  const handlePublish = async (quizId) => {
-    try {
-      const response = await publishQuiz(quizId);
-      if (response.success) {
-        toast.success('Quiz published successfully!');
-        fetchQuizzes();
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to publish quiz');
+  const openConfirmDialog = ({ title, message, confirmText, confirmColor, onConfirm }) => {
+    setConfirmDialog({
+      open: true,
+      title,
+      message,
+      confirmText,
+      confirmColor,
+      onConfirm
+    });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog(prev => ({ ...prev, open: false, onConfirm: null }));
+  };
+
+  const handleConfirmAction = async () => {
+    if (typeof confirmDialog.onConfirm === 'function') {
+      await confirmDialog.onConfirm();
     }
+    closeConfirmDialog();
+  };
+
+  const handlePublish = async (quizId) => {
+    openConfirmDialog({
+      title: 'Publish Quiz',
+      message: 'Are you sure you want to publish this quiz? Once published, students will be able to see and attempt it.',
+      confirmText: 'Publish',
+      confirmColor: 'success',
+      onConfirm: async () => {
+        try {
+          const response = await publishQuiz(quizId);
+          if (response.success) {
+            toast.success('Quiz published successfully!');
+            fetchQuizzes();
+          } else {
+            toast.error(response.message || 'Failed to publish quiz');
+          }
+        } catch (error) {
+          const errorMessage = error.response?.data?.message || error.message || 'Failed to publish quiz';
+          toast.error(errorMessage);
+          console.error('Publish error:', error);
+        }
+      }
+    });
     handleMenuClose();
   };
 
   const handleDelete = async (quizId) => {
-    if (window.confirm('Are you sure you want to delete this quiz?')) {
-      try {
-        await deleteQuiz(quizId);
-        toast.success('Quiz deleted successfully!');
-        fetchQuizzes();
-      } catch (error) {
-        toast.error('Failed to delete quiz');
+    openConfirmDialog({
+      title: 'Delete Quiz',
+      message: 'Are you sure you want to delete this quiz? This action cannot be undone.',
+      confirmText: 'Delete',
+      confirmColor: 'error',
+      onConfirm: async () => {
+        try {
+          await deleteQuiz(quizId);
+          toast.success('Quiz deleted successfully!');
+          fetchQuizzes();
+        } catch (error) {
+          toast.error('Failed to delete quiz');
+        }
       }
+    });
+    handleMenuClose();
+  };
+
+  const handleStatusChange = async (quizId, newStatus) => {
+    try {
+      const response = await toggleQuizStatus(quizId, newStatus);
+      if (response.success) {
+        toast.success(`Quiz status changed to ${newStatus}`);
+        fetchQuizzes();
+      } else {
+        toast.error(response.message || 'Failed to change status');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to change status';
+      toast.error(errorMessage);
     }
     handleMenuClose();
   };
@@ -110,8 +204,7 @@ const MyQuizzes = () => {
     const colors = {
       draft: 'default',
       published: 'success',
-      active: 'primary',
-      completed: 'info'
+      closed: 'error'
     };
     return colors[status] || 'default';
   };
@@ -162,7 +255,7 @@ const MyQuizzes = () => {
             {/* Quiz Cards */}
             {loading ? (
               <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography>Loading quizzes...</Typography>
+                <AnimatedLoader message="Loading quizzes" size="large" />
               </Box>
             ) : quizzes.length === 0 ? (
               <Card sx={{ borderRadius: 3, boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
@@ -246,6 +339,62 @@ const MyQuizzes = () => {
                             <Typography variant="body2" fontWeight="600" sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>{quiz.totalMarks}</Typography>
                           </Grid>
                         </Grid>
+
+                        {/* Quick Status Actions */}
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 3, pt: 2, borderTop: '1px solid #e2e8f0' }}>
+                          {isFacultyOrAdmin && quiz.status === 'draft' && (
+                            <Button 
+                              size="small"
+                              variant="contained"
+                              sx={{ flex: 1, minHeight: '36px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}
+                              onClick={() => handlePublish(quiz._id)}
+                            >
+                              Publish
+                            </Button>
+                          )}
+                          {isFacultyOrAdmin && quiz.status === 'published' && (
+                            <>
+                              <Button 
+                                size="small"
+                                variant="contained"
+                                color="error"
+                                sx={{ flex: 1, minHeight: '36px', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}
+                                onClick={() => handleStatusChange(quiz._id, 'closed')}
+                              >
+                                Close
+                              </Button>
+                              <Button 
+                                size="small"
+                                variant="outlined"
+                                sx={{ flex: 1, minHeight: '36px', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}
+                                onClick={() => handleStatusChange(quiz._id, 'draft')}
+                              >
+                                Unpublish
+                              </Button>
+                            </>
+                          )}
+                          {isFacultyOrAdmin && quiz.status === 'closed' && (
+                            <>
+                              <Button 
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                sx={{ flex: 1, minHeight: '36px', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}
+                                onClick={() => handleStatusChange(quiz._id, 'published')}
+                              >
+                                Reopen
+                              </Button>
+                              <Button 
+                                size="small"
+                                variant="outlined"
+                                sx={{ flex: 1, minHeight: '36px', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}
+                                onClick={() => handleStatusChange(quiz._id, 'draft')}
+                              >
+                                Make Draft
+                              </Button>
+                            </>
+                          )}
+                        </Box>
                       </CardContent>
                     </Card>
                   </Grid>
@@ -263,21 +412,76 @@ const MyQuizzes = () => {
                 <VisibilityIcon fontSize="small" sx={{ mr: 1 }} />
                 View Details
               </MenuItem>
-              <MenuItem onClick={() => navigate(`/edit-quiz/${selectedQuiz?._id}`)}>
-                <EditIcon fontSize="small" sx={{ mr: 1 }} />
-                Edit
-              </MenuItem>
-              {selectedQuiz?.status === 'draft' && (
+              {isFacultyOrAdmin && (
+                <MenuItem onClick={() => navigate(`/edit-quiz/${selectedQuiz?._id}`)}>
+                  <EditIcon fontSize="small" sx={{ mr: 1 }} />
+                  Edit
+                </MenuItem>
+              )}
+              {isFacultyOrAdmin && selectedQuiz?.status === 'draft' && (
                 <MenuItem onClick={() => handlePublish(selectedQuiz?._id)}>
                   <PublishIcon fontSize="small" sx={{ mr: 1 }} />
                   Publish
                 </MenuItem>
               )}
-              <MenuItem onClick={() => handleDelete(selectedQuiz?._id)} sx={{ color: 'error.main' }}>
-                <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
-                Delete
-              </MenuItem>
+              {isFacultyOrAdmin && selectedQuiz?.status === 'published' && (
+                <>
+                  <MenuItem onClick={() => handleStatusChange(selectedQuiz?._id, 'closed')} sx={{ color: 'error.main' }}>
+                    <Chip label="●" size="small" color="error" sx={{ mr: 1, minWidth: '24px' }} />
+                    Close
+                  </MenuItem>
+                  <MenuItem onClick={() => handleStatusChange(selectedQuiz?._id, 'draft')}>
+                    <PublishIcon fontSize="small" sx={{ mr: 1 }} />
+                    Unpublish
+                  </MenuItem>
+                </>
+              )}
+              {isFacultyOrAdmin && selectedQuiz?.status === 'closed' && (
+                <>
+                  <MenuItem onClick={() => handleStatusChange(selectedQuiz?._id, 'published')} sx={{ color: 'success.main' }}>
+                    <Chip label="●" size="small" color="success" sx={{ mr: 1, minWidth: '24px' }} />
+                    Reopen
+                  </MenuItem>
+                  <MenuItem onClick={() => handleStatusChange(selectedQuiz?._id, 'draft')}>
+                    <PublishIcon fontSize="small" sx={{ mr: 1 }} />
+                    Make Draft
+                  </MenuItem>
+                </>
+              )}
+              {isFacultyOrAdmin && (
+                <MenuItem onClick={() => handleDelete(selectedQuiz?._id)} sx={{ color: 'error.main' }}>
+                  <DeleteIcon fontSize="small" sx={{ mr: 1 }} />
+                  Delete
+                </MenuItem>
+              )}
             </Menu>
+
+            {/* In-page Confirm Dialog */}
+            <Dialog
+              open={confirmDialog.open}
+              onClose={closeConfirmDialog}
+              maxWidth="xs"
+              fullWidth
+            >
+              <DialogTitle>
+                <Typography variant="h6" fontWeight="bold">{confirmDialog.title}</Typography>
+              </DialogTitle>
+              <DialogContent>
+                <Typography variant="body2" color="text.secondary">
+                  {confirmDialog.message}
+                </Typography>
+              </DialogContent>
+              <DialogActions>
+                <Button onClick={closeConfirmDialog} variant="outlined">Cancel</Button>
+                <Button
+                  onClick={handleConfirmAction}
+                  variant="contained"
+                  color={confirmDialog.confirmColor || 'primary'}
+                >
+                  {confirmDialog.confirmText || 'Confirm'}
+                </Button>
+              </DialogActions>
+            </Dialog>
 
             {/* View Dialog */}
             <Dialog open={viewDialog} onClose={() => setViewDialog(false)} maxWidth="sm" fullWidth>

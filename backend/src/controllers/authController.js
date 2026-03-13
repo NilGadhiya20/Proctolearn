@@ -3,11 +3,12 @@ import Institution from '../models/Institution.js';
 import { generateToken, generateRefreshToken } from '../utils/authUtils.js';
 import { HTTP_STATUS, USER_ROLES } from '../config/constants.js';
 import { asyncHandler } from '../utils/errorHandler.js';
-import { sendVerificationEmail } from '../utils/emailService.js';
+import { sendVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } from '../utils/emailService.js';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
 
 const googleClient = process.env.GOOGLE_CLIENT_ID
   ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
@@ -60,9 +61,18 @@ export const registerUser = asyncHandler(async (req, res) => {
   // Generate email verification token
   const emailVerificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
 
-  // Send verification email
+  // Send verification email and welcome email
   if (process.env.NODE_ENV !== 'test') {
+    // Send verification email
     await sendVerificationEmail(email, emailVerificationToken, firstName);
+    
+    // Send welcome email with user details
+    await sendWelcomeEmail(
+      email, 
+      firstName, 
+      role, 
+      institution.name
+    );
   }
 
   // Generate tokens
@@ -82,7 +92,7 @@ export const registerUser = asyncHandler(async (req, res) => {
 
 // Login User
 export const loginUser = asyncHandler(async (req, res) => {
-  const { email, password, adminCode } = req.body;
+  const { email, password, adminCode, role } = req.body;
 
   // Validate input
   if (!email || !password) {
@@ -107,6 +117,16 @@ export const loginUser = asyncHandler(async (req, res) => {
     return res.status(HTTP_STATUS.UNAUTHORIZED).json({
       success: false,
       message: 'Invalid email or password'
+    });
+  }
+
+  // Check if user's role matches the login section
+  if (role && user.role !== role) {
+    return res.status(HTTP_STATUS.FORBIDDEN).json({
+      success: false,
+      message: `You must be a ${role} to login through the ${role} section.`,
+      expectedRole: role,
+      userRole: user.role
     });
   }
 
@@ -373,6 +393,50 @@ export const logoutUser = asyncHandler(async (req, res) => {
   });
 });
 
+// Test Email Configuration (Admin only - for debugging)
+export const testEmailConfiguration = asyncHandler(async (req, res) => {
+  const { testEmail } = req.body;
+
+  if (!testEmail) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Test email address is required'
+    });
+  }
+
+  try {
+    // Import email service dynamically
+    const { sendPasswordResetEmail } = await import('../utils/emailService.js');
+
+    const result = await sendPasswordResetEmail(
+      testEmail,
+      'test-token-12345',
+      'Test User'
+    );
+
+    if (result.success) {
+      return res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Test email sent successfully',
+        details: 'Email configuration is working properly'
+      });
+    } else {
+      return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+        success: false,
+        message: 'Test email failed',
+        details: result.error || 'Unknown error'
+      });
+    }
+  } catch (error) {
+    console.error('Test email error:', error);
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+      success: false,
+      message: 'Test email configuration failed',
+      details: error.message
+    });
+  }
+});
+
 // Request Faculty Role
 export const requestFacultyRole = asyncHandler(async (req, res) => {
   const { reason, qualifications } = req.body;
@@ -496,6 +560,121 @@ export const reviewFacultyRequest = asyncHandler(async (req, res) => {
     success: true,
     message: `Faculty request ${action}d successfully`,
     data: user
+  });
+});
+
+// Forgot Password - Send Reset Email
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  // Validate email
+  if (!email) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Email is required'
+    });
+  }
+
+  // Find user by email
+  const user = await User.findOne({ email: email.toLowerCase() });
+  
+  if (!user) {
+    // For security, don't reveal if email exists
+    return res.status(HTTP_STATUS.OK).json({
+      success: true,
+      message: 'If an account exists with this email, a password reset link will be sent'
+    });
+  }
+
+  // Generate reset token
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  
+  // Hash and store the token in database
+  user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
+  
+  await user.save();
+
+  // Send email with reset link
+  const emailResult = await sendPasswordResetEmail(
+    user.email,
+    resetToken,
+    user.firstName
+  );
+
+  if (!emailResult.success) {
+    // Clear the reset token if email fails
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    console.error('Password reset email failed:', emailResult.error);
+    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+      success: false,
+      message: 'Failed to send password reset email. Please try again later or contact support.'
+    });
+  }
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Password reset link sent to your email. Link expires in 5 minutes.'
+  });
+});
+
+// Reset Password - Verify Token and Update Password
+export const resetPassword = asyncHandler(async (req, res) => {
+  const { token, email, newPassword, confirmPassword } = req.body;
+
+  // Validate inputs
+  if (!token || !email || !newPassword || !confirmPassword) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'All fields are required'
+    });
+  }
+
+  // Check password match
+  if (newPassword !== confirmPassword) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Passwords do not match'
+    });
+  }
+
+  // Check password length
+  if (newPassword.length < 6) {
+    return res.status(HTTP_STATUS.BAD_REQUEST).json({
+      success: false,
+      message: 'Password must be at least 6 characters'
+    });
+  }
+
+  // Find user and verify reset token
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  
+  const user = await User.findOne({
+    email: email.toLowerCase(),
+    passwordResetToken: hashedToken,
+    passwordResetExpires: { $gt: new Date() } // Token not expired
+  });
+
+  if (!user) {
+    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+      success: false,
+      message: 'Invalid or expired reset token. Please request a new password reset.'
+    });
+  }
+
+  // Update password
+  user.password = newPassword;
+  user.passwordResetToken = undefined;
+  user.passwordResetExpires = undefined;
+  
+  await user.save();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Password reset successfully. You can now login with your new password.'
   });
 });
 

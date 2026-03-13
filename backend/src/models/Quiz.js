@@ -41,7 +41,10 @@ const quizSchema = new mongoose.Schema(
       endDate: Date,
       timeZone: String
     },
-    allowedAttempts: { type: Number, default: 1 },
+    attemptSettings: {
+      hasLimit: { type: Boolean, default: false },
+      maxAttempts: { type: Number, default: null }
+    },
     shuffleQuestions: { type: Boolean, default: false },
     shuffleOptions: { type: Boolean, default: false },
     showCorrectAnswers: { type: Boolean, default: true },

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Container,
   Box,
@@ -32,6 +32,7 @@ import GradingIcon from '@mui/icons-material/Grading';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import PendingIcon from '@mui/icons-material/Pending';
 import toast from 'react-hot-toast';
+import { getAllQuizzes, getQuizSubmissions } from '../services/quizService';
 
 const GradeSubmissions = () => {
   const navigate = useNavigate();
@@ -42,39 +43,56 @@ const GradeSubmissions = () => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
   const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  const [submissions] = useState([
-    { 
-      id: 1, 
-      student: 'John Doe', 
-      quiz: 'Mathematics Quiz 1', 
-      score: 85, 
-      totalMarks: 100,
-      status: 'graded',
-      submittedAt: '2025-12-30 10:30 AM'
-    },
-    { 
-      id: 2, 
-      student: 'Jane Smith', 
-      quiz: 'Science Quiz 2', 
-      score: null, 
-      totalMarks: 100,
-      status: 'pending',
-      submittedAt: '2025-12-31 09:15 AM'
-    },
-    { 
-      id: 3, 
-      student: 'Bob Johnson', 
-      quiz: 'History Quiz 1', 
-      score: 92, 
-      totalMarks: 100,
-      status: 'graded',
-      submittedAt: '2025-12-29 02:45 PM'
-    }
-  ]);
+  const [submissions, setSubmissions] = useState([]);
+
+  useEffect(() => {
+    const loadSubmissions = async () => {
+      try {
+        setLoading(true);
+        const quizResponse = await getAllQuizzes();
+        const quizzes = quizResponse?.data || [];
+
+        const allSubmissionGroups = await Promise.all(
+          quizzes.map(async (quiz) => {
+            try {
+              const res = await getQuizSubmissions(quiz._id);
+              const quizSubs = res?.data || [];
+              return quizSubs.map((s) => ({
+                id: s._id,
+                student: `${s.student?.firstName || ''} ${s.student?.lastName || ''}`.trim() || 'Unknown Student',
+                studentEmail: s.student?.email || '-',
+                quiz: quiz.title,
+                score: typeof s.percentage === 'number' ? Math.round(s.percentage) : null,
+                totalMarks: s.totalMarks || quiz.totalMarks || 100,
+                status: s.status === 'graded' ? 'graded' : (s.status === 'submitted' ? 'pending' : 'in_progress'),
+                submittedAt: s.submittedAt || s.updatedAt || s.createdAt
+              }));
+            } catch {
+              return [];
+            }
+          })
+        );
+
+        const merged = allSubmissionGroups
+          .flat()
+          .filter((s) => s.status !== 'in_progress')
+          .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
+
+        setSubmissions(merged);
+      } catch (error) {
+        toast.error('Failed to load submissions');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSubmissions();
+  }, []);
 
   const handleGradeSubmission = () => {
-    toast.success('Submission graded successfully!');
+    toast.success('Grade captured in UI. Backend grade-save API can be added next.');
     setGradeDialog(false);
     setGrade('');
     setFeedback('');
@@ -85,8 +103,8 @@ const GradeSubmissions = () => {
     setGradeDialog(true);
   };
 
-  const pendingSubmissions = submissions.filter(s => s.status === 'pending');
-  const gradedSubmissions = submissions.filter(s => s.status === 'graded');
+  const pendingSubmissions = useMemo(() => submissions.filter(s => s.status === 'pending'), [submissions]);
+  const gradedSubmissions = useMemo(() => submissions.filter(s => s.status === 'graded'), [submissions]);
 
   const stats = [
     { title: 'Total Submissions', value: submissions.length, gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
@@ -160,6 +178,13 @@ const GradeSubmissions = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
+                      {loading && (
+                        <TableRow>
+                          <TableCell colSpan={6}>
+                            <Typography color="text.secondary">Loading real submissions...</Typography>
+                          </TableCell>
+                        </TableRow>
+                      )}
                       {submissions.map((submission) => (
                         <TableRow key={submission.id} hover>
                           <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>
@@ -170,10 +195,13 @@ const GradeSubmissions = () => {
                               <Typography variant="body2" fontWeight="600" sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>
                                 {submission.student}
                               </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {submission.studentEmail}
+                              </Typography>
                             </Box>
                           </TableCell>
                           <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>{submission.quiz}</TableCell>
-                          <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>{submission.submittedAt}</TableCell>
+                          <TableCell sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>{submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : '-'}</TableCell>
                           <TableCell align="center" sx={{ fontSize: { xs: '0.85rem', sm: '0.95rem', md: '1rem' } }}>
                             {submission.score !== null ? (
                               <Chip 
