@@ -3,9 +3,11 @@ import Question from '../models/Question.js';
 import StudentSubmission from '../models/StudentSubmission.js';
 import ActivityLog from '../models/ActivityLog.js';
 import ExamSession from '../models/ExamSession.js';
+import User from '../models/User.js';
 import mongoose from 'mongoose';
 import { HTTP_STATUS, QUIZ_STATUS, SUBMISSION_STATUS } from '../config/constants.js';
 import { asyncHandler } from '../utils/errorHandler.js';
+import { notifyNewQuiz } from '../services/emailNotificationService.js';
 
 // Add Questions to a Quiz
 export const addQuestionsToQuiz = asyncHandler(async (req, res) => {
@@ -406,10 +408,66 @@ export const publishQuiz = asyncHandler(async (req, res) => {
   quiz.status = QUIZ_STATUS.PUBLISHED;
   await quiz.save();
 
+  // Target students: assigned students if present, otherwise all students in the same institution
+  const studentFilter = {
+    institution: req.institutionId,
+    role: 'student'
+  };
+
+  if (Array.isArray(quiz.assignedStudents) && quiz.assignedStudents.length > 0) {
+    studentFilter._id = { $in: quiz.assignedStudents };
+  }
+
+  const targetStudents = await User.find(studentFilter)
+    .select('_id email firstName preferences.emailNotifications')
+    .lean();
+
+  const quizDueDate =
+    quiz?.accessWindow?.endDate ||
+    quiz?.endTime ||
+    (quiz?.startTime ? new Date(new Date(quiz.startTime).getTime() + quiz.duration * 60 * 1000) : new Date(Date.now() + quiz.duration * 60 * 1000));
+
+  // Email is first priority; service already respects emailNotifications preference.
+  const emailResult = await notifyNewQuiz(
+    quiz._id,
+    quiz.title,
+    quiz.subject || 'General',
+    quizDueDate,
+    targetStudents
+  );
+
+  // In-app real-time notification to student dashboard (socket)
+  const io = req.app.get('io');
+  if (io) {
+    const publishedBy = req.user?.firstName && req.user?.lastName
+      ? `${req.user.firstName} ${req.user.lastName}`
+      : 'Faculty';
+
+    for (const student of targetStudents) {
+      io.to(`student-${String(student._id)}`).emit('quiz-published-notification', {
+        quizId: String(quiz._id),
+        title: quiz.title,
+        subject: quiz.subject || 'General',
+        chapter: quiz.chapter || '',
+        duration: quiz.duration,
+        totalMarks: quiz.totalMarks,
+        publishedBy,
+        publishedAt: new Date().toISOString(),
+        dueDate: quizDueDate
+      });
+    }
+  }
+
   res.status(HTTP_STATUS.OK).json({
     success: true,
     message: 'Quiz published successfully',
-    data: quiz
+    data: quiz,
+    notificationSummary: {
+      targetedStudents: targetStudents.length,
+      emailsSent: emailResult.success,
+      emailsSkipped: emailResult.skipped || 0,
+      emailFailures: emailResult.failed || 0
+    }
   });
 });
 

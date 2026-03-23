@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Check, AlertCircle, Loader } from 'lucide-react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const SubscriptionForm = ({ variant = 'default', className = '' }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ type: '', message: '' });
+  const navigate = useNavigate();
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -51,6 +53,17 @@ const SubscriptionForm = ({ variant = 'default', className = '' }) => {
       }
     } catch (error) {
       console.error('Subscription error:', error);
+      if (error.response?.data?.requiresAccount) {
+        setStatus({
+          type: 'error',
+          message: 'To subscribe, you need an account. Redirecting to sign up...'
+        });
+        setTimeout(() => {
+          navigate(`/register?email=${encodeURIComponent(email.trim().toLowerCase())}&from=subscription`);
+        }, 1500);
+        return;
+      }
+
       setStatus({
         type: 'error',
         message: error.response?.data?.message || 'Failed to subscribe. Please try again.'

@@ -147,6 +147,19 @@ export const initializeSocketIO = (server) => {
       }
     });
 
+    // Join student dashboard notification room
+    socket.on('join-student-dashboard', (data = {}) => {
+      const { studentId, institutionId } = data;
+
+      if (studentId) {
+        socket.join(`student-${studentId}`);
+      }
+
+      if (institutionId) {
+        socket.join(`institution-${institutionId}-students`);
+      }
+    });
+
     // Log student activity
     socket.on('activity', async (data) => {
       const { submissionId, quizId, activityType, details } = data;

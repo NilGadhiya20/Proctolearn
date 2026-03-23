@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
@@ -18,8 +18,9 @@ import {
 import { useAuthStore } from '../../context/store';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 
-const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }) => {
+const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems, showUserFooter = true }) => {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 1024);
   const [isDragging, setIsDragging] = React.useState(false);
   const dragControls = useDragControls();
@@ -133,6 +134,11 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
     setIsDragging(true);
   };
 
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -162,7 +168,7 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         className={`
-          ${isMobile ? 'fixed' : 'static'} 
+          ${isMobile ? 'fixed' : 'sticky top-0 self-start h-screen'} 
           inset-y-0 left-0 z-50 w-72 
           bg-white/95 backdrop-blur-xl 
           border-r border-slate-200/60 
@@ -306,38 +312,40 @@ const DashboardSidebar = ({ open, onClose, activeItem, onNavigate, customItems }
           </nav>
 
           {/* User Profile Footer */}
-          <motion.div 
-            className="p-4 border-t border-slate-100 bg-slate-50/70"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-          >
-            <div className="mb-3 p-3 bg-white/60 rounded-xl border border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
-                  {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-black truncate">
-                    {user?.firstName} {user?.lastName}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {user?.email}
-                  </p>
+          {showUserFooter && (
+            <motion.div 
+              className="p-4 border-t border-slate-100 bg-slate-50/70"
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3, duration: 0.4 }}
+            >
+              <div className="mb-3 p-3 bg-white/60 rounded-xl border border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-lime-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-black truncate">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      {user?.email}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            
-            <motion.button
-              onClick={logout}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full flex items-center gap-3 justify-center px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all text-sm font-semibold shadow-sm"
-            >
-              <LogOut size={16} />
-              <span>Sign Out</span>
-            </motion.button>
-          </motion.div>
+              
+              <motion.button
+                onClick={handleLogout}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full flex items-center gap-3 justify-center px-4 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all text-sm font-semibold shadow-sm"
+              >
+                <LogOut size={16} />
+                <span>Sign Out</span>
+              </motion.button>
+            </motion.div>
+          )}
         </div>
       </motion.aside>
     </>

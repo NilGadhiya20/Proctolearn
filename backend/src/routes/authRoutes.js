@@ -2,6 +2,7 @@ import express from 'express';
 import { registerUser, loginUser, refreshAccessToken, getCurrentUser, logoutUser, googleAuthLogin, verifyEmailExists, requestFacultyRole, getFacultyRequests, reviewFacultyRequest, forgotPassword, resetPassword, testEmailConfiguration } from '../controllers/authController.js';
 import { validateUserRegistration, validateUserLogin } from '../middleware/validation.js';
 import { auth, checkRole } from '../middleware/auth.js';
+import { facultyRequestUpload } from '../middleware/facultyRequestUpload.js';
 import { asyncHandler } from '../utils/errorHandler.js';
 import { HTTP_STATUS, USER_ROLES } from '../config/constants.js';
 import User from '../models/User.js';
@@ -31,6 +32,19 @@ router.patch('/profile',
     const updates = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
+    }
+
+    // Preferences updates
+    if (req.body.preferences && typeof req.body.preferences === 'object') {
+      const { notifications, emailNotifications } = req.body.preferences;
+
+      if (typeof notifications === 'boolean') {
+        updates['preferences.notifications'] = notifications;
+      }
+
+      if (typeof emailNotifications === 'boolean') {
+        updates['preferences.emailNotifications'] = emailNotifications;
+      }
     }
 
     if (Object.keys(updates).length === 0) {
@@ -79,7 +93,17 @@ router.get('/me/submissions',
 );
 
 // Faculty Request Routes
-router.post('/request-faculty', auth, requestFacultyRole);
+router.post('/request-faculty', auth, (req, res, next) => {
+  facultyRequestUpload.single('facultyRequestPdf')(req, res, (err) => {
+    if (err) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({
+        success: false,
+        message: err.message || 'Invalid file upload'
+      });
+    }
+    next();
+  });
+}, requestFacultyRole);
 router.get('/faculty-requests', auth, checkRole(USER_ROLES.ADMIN), getFacultyRequests);
 router.patch('/faculty-requests/:userId', auth, checkRole(USER_ROLES.ADMIN), reviewFacultyRequest);
 

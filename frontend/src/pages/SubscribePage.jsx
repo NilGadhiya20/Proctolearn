@@ -174,7 +174,7 @@ const SubscribePage = () => {
                 Do I need an account to subscribe?
               </h3>
               <p className="text-gray-600 dark:text-gray-400 text-sm">
-                No! You can subscribe to our newsletter without creating an account. Just enter your email address.
+                Yes. You need a Proctolearn account to subscribe. If your email is not registered, you will be redirected to sign up.
               </p>
             </div>
           </div>

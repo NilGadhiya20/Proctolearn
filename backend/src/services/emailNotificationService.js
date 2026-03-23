@@ -13,10 +13,16 @@ export const notifyNewQuiz = async (quizId, quizTitle, subject, dueDate, enrolle
   const emailResults = {
     success: 0,
     failed: 0,
+    skipped: 0,
     errors: []
   };
 
   for (const student of enrolledStudents) {
+    if (student?.preferences?.emailNotifications === false) {
+      emailResults.skipped++;
+      continue;
+    }
+
     try {
       const quizLink = `${process.env.FRONTEND_URL}/quiz/${quizId}`;
       const result = await sendNewQuizEmail(
@@ -48,7 +54,13 @@ export const scheduleQuizReminder = async (quizId, enrolledStudents, reminderTim
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new Error('Quiz not found');
 
+  let scheduledCount = 0;
+
   for (const student of enrolledStudents) {
+    if (student?.preferences?.emailNotifications === false) {
+      continue;
+    }
+
     const emailData = {
       email: student.email,
       subject: `⏰ Reminder: Quiz "${quiz.title}" Due Soon`,
@@ -86,11 +98,12 @@ export const scheduleQuizReminder = async (quizId, enrolledStudents, reminderTim
     };
 
     emailQueue.addToQueue(emailData);
+    scheduledCount++;
   }
 
   return {
     success: true,
-    message: `${enrolledStudents.length} reminder emails scheduled`
+    message: `${scheduledCount} reminder emails scheduled`
   };
 };
 
@@ -101,10 +114,16 @@ export const notifyQuizUpdate = async (quizId, updateMessage, enrolledStudents) 
 
   const emailResults = {
     success: 0,
-    failed: 0
+    failed: 0,
+    skipped: 0
   };
 
   for (const student of enrolledStudents) {
+    if (student?.preferences?.emailNotifications === false) {
+      emailResults.skipped++;
+      continue;
+    }
+
     try {
       const actionUrl = `${process.env.FRONTEND_URL}/quiz/${quizId}`;
       const result = await sendQuizUpdateEmail(
@@ -134,6 +153,7 @@ export const notifyContentUpdate = async (updateType, updateDetails, recipientEm
   const emailResults = {
     success: 0,
     failed: 0,
+    skipped: 0,
     errors: []
   };
 
@@ -141,6 +161,10 @@ export const notifyContentUpdate = async (updateType, updateDetails, recipientEm
     try {
       // Get student name if email is in standard format
       const student = await User.findOne({ email });
+      if (student?.preferences?.emailNotifications === false) {
+        emailResults.skipped++;
+        continue;
+      }
       const studentName = student ? student.firstName : 'Student';
 
       const result = await sendContentUpdateEmail(
@@ -211,10 +235,15 @@ export const sendBulkAnnouncement = async (recipientEmails, title, message, acti
     </html>
   `;
 
-  const recipients = recipientEmails.map(email => ({
-    email,
-    userName: 'Student'
-  }));
+  const users = await User.find({ email: { $in: recipientEmails } }).select('email firstName preferences.emailNotifications');
+  const usersByEmail = new Map(users.map((u) => [u.email, u]));
+
+  const recipients = recipientEmails
+    .filter((email) => usersByEmail.get(email)?.preferences?.emailNotifications !== false)
+    .map(email => ({
+      email,
+      userName: usersByEmail.get(email)?.firstName || 'Student'
+    }));
 
   return await sendBatchEmails(recipients, emailTemplate, { subject: title });
 };
@@ -223,7 +252,14 @@ export const sendBulkAnnouncement = async (recipientEmails, title, message, acti
 export const scheduleBulkEmails = async (recipientEmails, subject, htmlTemplate, scheduledFor) => {
   const scheduledEmails = [];
 
+  const users = await User.find({ email: { $in: recipientEmails } }).select('email preferences.emailNotifications');
+  const usersByEmail = new Map(users.map((u) => [u.email, u]));
+
   for (const email of recipientEmails) {
+    if (usersByEmail.get(email)?.preferences?.emailNotifications === false) {
+      continue;
+    }
+
     const emailData = {
       email,
       subject,

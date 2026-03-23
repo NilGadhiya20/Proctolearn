@@ -1,8 +1,60 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Linkedin, Mail, Phone, MapPin, Globe, ShieldCheck, Award, Lock, Server, Layers, CheckCircle2 } from 'lucide-react';
+import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const AuthFooter = () => {
+  const [email, setEmail] = useState('');
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const navigate = useNavigate();
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      toast.error('Please enter your email address.');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      toast.error('Please enter a valid email address.');
+      return;
+    }
+
+    try {
+      setIsSubscribing(true);
+
+      const response = await axios.post(`${API_URL}/subscriptions/subscribe`, {
+        email: normalizedEmail,
+        source: 'website'
+      });
+
+      if (response?.data?.success) {
+        toast.success(response.data.message || 'Subscription successful. Please check your email.');
+        setEmail('');
+      }
+    } catch (error) {
+      const requiresAccount = error?.response?.data?.requiresAccount;
+      const message = error?.response?.data?.message || 'Failed to subscribe. Please try again.';
+
+      if (requiresAccount) {
+        toast.error('For subscription, please create an account first. Redirecting to sign up...');
+        setTimeout(() => {
+          navigate(`/register?email=${encodeURIComponent(normalizedEmail)}&from=subscription`);
+        }, 1200);
+        return;
+      }
+
+      toast.error(message);
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
+
   return (
     <footer className="bg-gradient-to-b from-gray-900 to-gray-950 text-gray-300 border-t border-gray-800">
       {/* Main Footer Content */}
@@ -90,16 +142,24 @@ const AuthFooter = () => {
               <h4 className="text-white font-semibold text-lg mb-2">Stay Updated</h4>
               <p className="text-sm text-gray-400">Subscribe to get updates on proctoring features and policy changes.</p>
             </div>
-            <div className="flex gap-2">
+            <form onSubmit={handleSubscribe} className="flex gap-2">
               <input
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
                 className="flex-1 px-4 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                disabled={isSubscribing}
+                required
               />
-              <button className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white text-sm font-semibold rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-md hover:shadow-lg">
-                Subscribe
+              <button
+                type="submit"
+                disabled={isSubscribing}
+                className="px-6 py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white text-sm font-semibold rounded-lg hover:from-green-700 hover:to-teal-700 transition-all shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isSubscribing ? 'Subscribing...' : 'Subscribe'}
               </button>
-            </div>
+            </form>
           </div>
         </div>
 

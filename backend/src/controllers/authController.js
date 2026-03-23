@@ -440,6 +440,7 @@ export const testEmailConfiguration = asyncHandler(async (req, res) => {
 // Request Faculty Role
 export const requestFacultyRole = asyncHandler(async (req, res) => {
   const { reason, qualifications } = req.body;
+  const uploadedPdf = req.file;
 
   if (!reason || !qualifications) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -478,7 +479,17 @@ export const requestFacultyRole = asyncHandler(async (req, res) => {
     status: 'pending',
     requestedAt: new Date(),
     reason,
-    qualifications
+    qualifications,
+    document: uploadedPdf
+      ? {
+          originalName: uploadedPdf.originalname,
+          fileName: uploadedPdf.filename,
+          mimeType: uploadedPdf.mimetype,
+          size: uploadedPdf.size,
+          path: `/uploads/faculty-requests/${uploadedPdf.filename}`,
+          uploadedAt: new Date()
+        }
+      : undefined
   };
 
   await user.save();

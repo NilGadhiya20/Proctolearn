@@ -27,7 +27,11 @@ import {
   BarChart3,
   CreditCard,
   LogIn,
-  UserPlus
+  UserPlus,
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin
 } from 'lucide-react';
 import { useAuthStore } from '../context/store';
 
@@ -954,15 +958,24 @@ If issues persist, contact us with your browser version, operating system, and s
                 AI-Powered Proctored Assessment Platform - Making online education secure, transparent and accountable.
               </p>
               <div className="flex gap-3">
-                {['facebook-f', 'twitter', 'instagram', 'linkedin-in'].map((social) => (
-                  <a 
-                    key={social} 
-                    href="#" 
-                    className="w-12 h-12 rounded-lg bg-slate-800 hover:bg-gradient-to-r hover:from-emerald-600 hover:to-lime-500 flex items-center justify-center transition-all duration-300 hover:scale-125 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/30 active:scale-95"
+                {[
+                  { name: 'Facebook', icon: Facebook },
+                  { name: 'Twitter', icon: Twitter },
+                  { name: 'Instagram', icon: Instagram },
+                  { name: 'LinkedIn', icon: Linkedin }
+                ].map((social) => {
+                  const Icon = social.icon;
+                  return (
+                  <a
+                    key={social.name}
+                    href="#"
+                    aria-label={social.name}
+                    className="w-12 h-12 rounded-lg bg-slate-800/95 border border-slate-700 text-slate-200 hover:text-white hover:border-emerald-400 hover:bg-gradient-to-r hover:from-emerald-600 hover:to-lime-500 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/35 active:scale-95"
                   >
-                    <i className={`fab fa-${social} text-sm`}></i>
+                    <Icon className="w-4 h-4" />
                   </a>
-                ))}
+                );
+                })}
               </div>
             </div>
 

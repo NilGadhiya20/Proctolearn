@@ -85,6 +85,14 @@ const userSchema = new mongoose.Schema(
       requestedAt: Date,
       reason: String,
       qualifications: String,
+      document: {
+        originalName: String,
+        fileName: String,
+        mimeType: String,
+        size: Number,
+        path: String,
+        uploadedAt: Date
+      },
       reviewedAt: Date,
       reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,

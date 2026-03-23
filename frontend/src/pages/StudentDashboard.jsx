@@ -1,24 +1,28 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { 
-  BookOpen, 
-  Clock, 
-  Award, 
-  Target, 
-  Zap, 
-  CheckCircle, 
-  AlertCircle, 
-  Calendar, 
+import {
+  BookOpen,
+  Clock,
+  Award,
+  Target,
+  CheckCircle,
+  Calendar,
   Menu,
-  TrendingUp,
   BarChart3,
   User,
   Settings,
-  LogOut,
   UserCheck,
-  Play
+  Play,
+  X,
+  CheckCircle2,
+  XCircle,
+  Plus,
+  Mail,
+  Phone,
+  Pencil,
+  Save
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -35,6 +39,8 @@ import { useAuthStore } from '../context/store';
 import DashboardSidebar from '../components/Layout/DashboardSidebar';
 import { getMyQuizzes } from '../services/myQuizService';
 import { getAllQuizzes } from '../services/quizService';
+import api from '../services/api';
+import socket from '../socket';
 import '../styles/dashboards.css';
 import '../styles/dark-mode.css';
 
@@ -60,11 +66,35 @@ const StudentDashboard = () => {
   const [myQuizzes, setMyQuizzes] = useState([]);
   const [myQuizzesLoading, setMyQuizzesLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user, logout } = useAuthStore();
+  const { user, logout, setUser } = useAuthStore();
   const navigate = useNavigate();
+  const mainContentRef = useRef(null);
+  const sectionRefs = useRef({});
+  const profileImageInputRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState([]);
+  const [refreshCounter, setRefreshCounter] = useState(0);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [activeSidebarItem, setActiveSidebarItem] = useState('dashboard');
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileEditMode, setProfileEditMode] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    bio: '',
+    profilePicture: ''
+  });
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [emailToggleSaving, setEmailToggleSaving] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [existingRequest, setExistingRequest] = useState(null);
+  const [requestPdfFile, setRequestPdfFile] = useState(null);
+  const [requestFormData, setRequestFormData] = useState({
+    reason: '',
+    qualifications: ''
+  });
   const [stats, setStats] = useState({
     completedQuizzes: 0,
     totalAttempts: 0,
@@ -75,13 +105,30 @@ const StudentDashboard = () => {
   // Student sidebar navigation items
   const sidebarItems = [
     { icon: BarChart3, label: 'Dashboard', id: 'dashboard' },
-    { icon: BookOpen, label: 'Available Quizzes', id: 'quizzes', action: () => navigate('/available-quizzes') },
+    { icon: BookOpen, label: 'Available Quizzes', id: 'quizzes' },
     { icon: Award, label: 'My Results', id: 'results' },
     { icon: Target, label: 'Progress', id: 'progress' },
-    { icon: UserCheck, label: 'Request Faculty Role', id: 'request-faculty', action: () => navigate('/request-faculty') },
+    { icon: UserCheck, label: 'Request Faculty Role', id: 'request-faculty' },
     { icon: User, label: 'Profile', id: 'profile' },
     { icon: Settings, label: 'Settings', id: 'settings' }
   ];
+
+  useEffect(() => {
+    if (user?.facultyRequest) {
+      setExistingRequest(user.facultyRequest);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      phone: user.phone || '',
+      bio: user.bio || '',
+      profilePicture: user.profilePicture || ''
+    });
+  }, [user]);
 
   const getSubmissionPercent = (submission) => {
     if (typeof submission?.percentage === 'number') return Math.round(submission.percentage);
@@ -221,11 +268,254 @@ const StudentDashboard = () => {
     { label: 'Perfect Score', emoji: '🏆', locked: true }
   ];
   
-  const handleNavigation = (item) => {
-    if (item.action) {
-      item.action();
+  const scrollToSection = (sectionId) => {
+    const targetSection = sectionRefs.current[sectionId];
+    const mainArea = mainContentRef.current;
+    if (!targetSection || !mainArea) return;
+
+    mainArea.scrollTo({
+      top: targetSection.offsetTop - 16,
+      behavior: 'smooth'
+    });
+  };
+
+  const openProfileModal = () => {
+    if (!user) return;
+    setProfileForm({
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      phone: user.phone || '',
+      bio: user.bio || '',
+      profilePicture: user.profilePicture || ''
+    });
+    setProfileEditMode(false);
+    setProfileModalOpen(true);
+  };
+
+  const closeProfileModal = () => {
+    setProfileModalOpen(false);
+    setProfileEditMode(false);
+  };
+
+  const onProfileFieldChange = (e) => {
+    const { name, value } = e.target;
+    setProfileForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const onProfileImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      e.target.value = '';
+      return;
     }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileForm((prev) => ({ ...prev, profilePicture: String(reader.result || '') }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onProfileSave = async () => {
+    if (!profileForm.firstName.trim() || !profileForm.lastName.trim()) {
+      toast.error('First name and last name are required');
+      return;
+    }
+
+    try {
+      setProfileSaving(true);
+      const payload = {
+        firstName: profileForm.firstName.trim(),
+        lastName: profileForm.lastName.trim(),
+        phone: profileForm.phone.trim(),
+        bio: profileForm.bio.trim(),
+        profilePicture: profileForm.profilePicture
+      };
+
+      const response = await api.patch('/auth/profile', payload);
+      if (response?.data?.success) {
+        const updatedUser = response.data.data;
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        toast.success('Profile updated successfully');
+        setProfileEditMode(false);
+      } else {
+        toast.error(response?.data?.message || 'Unable to update profile');
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Unable to update profile');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const onProfileCancelEdit = () => {
+    setProfileForm({
+      firstName: user?.firstName || '',
+      lastName: user?.lastName || '',
+      phone: user?.phone || '',
+      bio: user?.bio || '',
+      profilePicture: user?.profilePicture || ''
+    });
+    setProfileEditMode(false);
+  };
+
+  const handleNavigation = (item) => {
+    setActiveSidebarItem(item.id);
+
+    if (item.id === 'request-faculty') {
+      if (user?.role !== 'student') {
+        toast.error('Only students can request faculty role');
+      } else {
+        setRequestModalOpen(true);
+      }
+      setSidebarOpen(false);
+      return;
+    }
+
+    if (item.id === 'profile') {
+      openProfileModal();
+      setSidebarOpen(false);
+      return;
+    }
+
+    scrollToSection(item.id);
     setSidebarOpen(false);
+  };
+
+  const getRequestStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-amber-100 text-amber-700 border-amber-300';
+      case 'approved':
+        return 'bg-green-100 text-green-700 border-green-300';
+      case 'rejected':
+        return 'bg-red-100 text-red-700 border-red-300';
+      default:
+        return 'bg-slate-100 text-slate-700 border-slate-300';
+    }
+  };
+
+  const handleRequestSubmit = async (e) => {
+    e.preventDefault();
+
+    if (user?.role !== 'student') {
+      toast.error('Only students can request faculty role');
+      return;
+    }
+
+    if (!requestFormData.reason.trim() || !requestFormData.qualifications.trim()) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    try {
+      setRequestSubmitting(true);
+      const payload = new FormData();
+      payload.append('reason', requestFormData.reason);
+      payload.append('qualifications', requestFormData.qualifications);
+      if (requestPdfFile) {
+        payload.append('facultyRequestPdf', requestPdfFile);
+      }
+
+      const response = await api.post('/auth/request-faculty', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      if (response?.data?.success) {
+        setExistingRequest(response.data.data);
+        setRequestFormData({ reason: '', qualifications: '' });
+        setRequestPdfFile(null);
+        toast.success('Faculty role request submitted successfully');
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to submit request');
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const handlePdfSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      toast.error('Only PDF files are allowed');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be 5MB or less');
+      e.target.value = '';
+      return;
+    }
+
+    setRequestPdfFile(file);
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'student') return;
+
+    const institutionId = typeof user.institution === 'string'
+      ? user.institution
+      : user.institution?._id;
+
+    socket.emit('join-student-dashboard', {
+      studentId: user._id,
+      institutionId
+    });
+
+    const onQuizPublished = (payload) => {
+      const subjectText = payload?.subject ? ` (${payload.subject})` : '';
+      toast.success(`New quiz published: ${payload?.title || 'Quiz'}${subjectText}`);
+      setRefreshCounter((prev) => prev + 1);
+    };
+
+    socket.on('quiz-published-notification', onQuizPublished);
+
+    return () => {
+      socket.off('quiz-published-notification', onQuizPublished);
+    };
+  }, [user]);
+
+  const handleEmailNotificationsToggle = async () => {
+    if (!user) return;
+
+    const currentValue = user?.preferences?.emailNotifications !== false;
+    const nextValue = !currentValue;
+
+    try {
+      setEmailToggleSaving(true);
+      const response = await api.patch('/auth/profile', {
+        preferences: {
+          emailNotifications: nextValue
+        }
+      });
+
+      if (response?.data?.success) {
+        const updatedUser = response.data.data;
+        setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        toast.success(nextValue ? 'Email updates enabled' : 'Email updates disabled');
+      } else {
+        toast.error(response?.data?.message || 'Failed to update notification settings');
+      }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || 'Failed to update notification settings');
+    } finally {
+      setEmailToggleSaving(false);
+    }
   };
 
   useEffect(() => {
@@ -320,7 +610,7 @@ const StudentDashboard = () => {
       const interval = setInterval(() => fetchData(false), 20000);
       return () => clearInterval(interval);
     }
-  }, [user]);
+  }, [user, refreshCounter]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-green-50 to-teal-50">
@@ -345,22 +635,23 @@ const StudentDashboard = () => {
         </div>
       </div>
 
-      <div className="flex h-screen lg:h-auto">
+      <div className="flex h-screen overflow-hidden">
         {/* Sidebar */}
         <DashboardSidebar
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          activeItem="dashboard"
+          activeItem={activeSidebarItem}
           onNavigate={handleNavigation}
           customItems={sidebarItems}
         />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto">
+        <main ref={mainContentRef} className="flex-1 overflow-auto">
           <div className="p-4 lg:p-8 max-w-7xl mx-auto">
             
             {/* Welcome Section */}
             <motion.div
+              ref={(el) => { sectionRefs.current.dashboard = el; }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
@@ -430,7 +721,10 @@ const StudentDashboard = () => {
             </div>
 
             {/* Charts Section */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 mb-8">
+            <div
+              ref={(el) => { sectionRefs.current.progress = el; }}
+              className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 mb-8"
+            >
               
               {/* Performance Chart */}
               <motion.div
@@ -471,6 +765,7 @@ const StudentDashboard = () => {
 
             {/* Available Quizzes Section */}
             <motion.div
+              ref={(el) => { sectionRefs.current.quizzes = el; }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.5 }}
@@ -598,6 +893,7 @@ const StudentDashboard = () => {
 
             {/* My Quiz History */}
             <motion.div
+              ref={(el) => { sectionRefs.current.results = el; }}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.9, duration: 0.5 }}
@@ -677,9 +973,401 @@ const StudentDashboard = () => {
               )}
             </motion.div>
 
+            {/* Settings Section */}
+            <motion.div
+              ref={(el) => { sectionRefs.current.settings = el; }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.0, duration: 0.5 }}
+              className="mt-8 bg-white/90 backdrop-blur-sm p-6 lg:p-8 rounded-2xl shadow-xl border border-slate-200/50"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                  <Settings size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg lg:text-xl font-bold text-slate-800">Settings</h3>
+                  <p className="text-sm text-slate-600">Account preferences (live user data)</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-slate-500 mb-1">Notifications</p>
+                  <p className="font-semibold text-slate-800">
+                    {user?.preferences?.notifications ? 'Enabled' : 'Disabled'}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-slate-500 mb-1">Email Updates</p>
+                      <p className="font-semibold text-slate-800">
+                        {user?.preferences?.emailNotifications !== false ? 'Enabled' : 'Disabled'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Receive quiz and platform email updates.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleEmailNotificationsToggle}
+                      disabled={emailToggleSaving}
+                      className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                        user?.preferences?.emailNotifications !== false ? 'bg-emerald-500' : 'bg-slate-300'
+                      } ${emailToggleSaving ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      aria-label="Toggle email notifications"
+                    >
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                          user?.preferences?.emailNotifications !== false ? 'translate-x-8' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
           </div>
         </main>
       </div>
+
+      {/* Profile Modal */}
+      <AnimatePresence>
+        {profileModalOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/45 backdrop-blur-sm z-[90]"
+              onClick={closeProfileModal}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[95] p-4 lg:p-8 flex items-start justify-center overflow-auto"
+            >
+              <div className="w-full max-w-5xl py-2">
+                <div className="text-center mb-4 rounded-2xl bg-white/95 border border-slate-200 shadow-sm py-4 px-3">
+                  <h2 className="text-4xl font-extrabold text-slate-900">My Profile</h2>
+                  <p className="text-slate-700 font-medium mt-2">View and update your information</p>
+                </div>
+
+                <div className="relative rounded-2xl bg-white border border-emerald-100 shadow-[0_18px_40px_rgba(2,132,199,0.08)] p-6 lg:p-10">
+                  <button
+                    type="button"
+                    aria-label="Close profile popup"
+                    onClick={closeProfileModal}
+                    className="absolute right-6 top-6 w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                  >
+                    <X size={20} />
+                  </button>
+
+                  <input
+                    ref={profileImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onProfileImageSelect}
+                  />
+
+                  <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-8">
+                    <div className="flex items-start gap-5">
+                      <div className="relative">
+                        <img
+                          src={profileForm.profilePicture || 'https://ui-avatars.com/api/?name=Student&background=22c55e&color=fff'}
+                          alt="Profile"
+                          className="w-36 h-36 rounded-full object-cover border-4 border-emerald-200"
+                        />
+                        {profileEditMode && (
+                          <button
+                            type="button"
+                            onClick={() => profileImageInputRef.current?.click()}
+                            className="absolute bottom-1 right-1 w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-lg hover:bg-emerald-600"
+                            title="Change profile photo"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      <div>
+                        <h3 className="text-5xl lg:text-4xl font-extrabold text-slate-900 leading-tight">
+                          {(profileForm.firstName || user?.firstName || '').toUpperCase()} {(profileForm.lastName || user?.lastName || '').toUpperCase()}
+                        </h3>
+                        <span className="inline-flex mt-3 px-4 py-1.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold text-2xl lg:text-xl">
+                          {user?.role === 'student' ? 'Student' : 'Faculty Member'}
+                        </span>
+
+                        <div className="mt-6 flex items-center gap-2 text-slate-500 text-2xl lg:text-xl break-all">
+                          <Mail size={20} className="text-emerald-600" />
+                          <span>{user?.email || 'No email'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      {!profileEditMode ? (
+                        <button
+                          type="button"
+                          onClick={() => setProfileEditMode(true)}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold shadow-[0_10px_24px_rgba(34,197,94,0.35)] hover:from-emerald-600 hover:to-lime-600"
+                        >
+                          <Pencil size={18} />
+                          Edit Profile
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={onProfileCancelEdit}
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold shadow-[0_10px_24px_rgba(34,197,94,0.35)] hover:from-emerald-600 hover:to-lime-600"
+                        >
+                          <X size={18} />
+                          Cancel Edit
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {!profileEditMode ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-6">
+                        <p className="text-emerald-700 font-semibold mb-2">Full Name</p>
+                        <p className="text-3xl lg:text-2xl font-extrabold text-slate-900">
+                          {`${profileForm.firstName || user?.firstName || ''} ${profileForm.lastName || user?.lastName || ''}`.trim() || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-6">
+                        <p className="text-emerald-700 font-semibold mb-2 flex items-center gap-2">
+                          <Phone size={16} />
+                          Phone
+                        </p>
+                        <p className="text-3xl lg:text-2xl font-extrabold text-slate-900">{profileForm.phone || 'N/A'}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm text-slate-600 mb-1">First Name</label>
+                          <input
+                            name="firstName"
+                            value={profileForm.firstName}
+                            onChange={onProfileFieldChange}
+                            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm text-slate-600 mb-1">Last Name</label>
+                          <input
+                            name="lastName"
+                            value={profileForm.lastName}
+                            onChange={onProfileFieldChange}
+                            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-600 mb-1">Phone</label>
+                        <input
+                          name="phone"
+                          value={profileForm.phone}
+                          onChange={onProfileFieldChange}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm text-slate-600 mb-1">Bio (Optional)</label>
+                        <textarea
+                          name="bio"
+                          rows={3}
+                          value={profileForm.bio}
+                          onChange={onProfileFieldChange}
+                          placeholder="Tell us about yourself..."
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200 flex flex-col md:flex-row gap-3">
+                        <button
+                          type="button"
+                          onClick={onProfileSave}
+                          disabled={profileSaving}
+                          className="flex-1 rounded-xl py-3 bg-gradient-to-r from-emerald-500 to-lime-500 text-white font-bold hover:from-emerald-600 hover:to-lime-600 disabled:opacity-60 flex items-center justify-center gap-2"
+                        >
+                          <Save size={16} />
+                          {profileSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={onProfileCancelEdit}
+                          className="flex-1 rounded-xl py-3 bg-slate-100 text-slate-700 font-semibold hover:bg-slate-200"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Request Faculty Role Modal */}
+      <AnimatePresence>
+        {requestModalOpen && user?.role === 'student' && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/45 backdrop-blur-sm z-[90]"
+              onClick={() => setRequestModalOpen(false)}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[95] p-4 lg:p-8 flex items-center justify-center"
+            >
+              <div className="w-full max-w-2xl max-h-[88vh] overflow-auto rounded-2xl bg-white shadow-2xl border border-slate-200">
+                <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-200 px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white">
+                      <UserCheck size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-900">Request Faculty Role</h2>
+                      <p className="text-sm text-slate-500">Submit your request for admin approval</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label="Close faculty request popup"
+                    onClick={() => setRequestModalOpen(false)}
+                    className="w-10 h-10 rounded-full border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 flex items-center justify-center"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-5 space-y-5">
+                  {existingRequest && existingRequest.status !== 'none' && (
+                    <div className="rounded-xl border border-slate-200 p-4 bg-slate-50/70">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <h3 className="font-semibold text-slate-900">Current Request Status</h3>
+                        <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-semibold border ${getRequestStatusColor(existingRequest.status)}`}>
+                          {existingRequest.status === 'approved' ? <CheckCircle2 size={14} /> : null}
+                          {existingRequest.status === 'rejected' ? <XCircle size={14} /> : null}
+                          {String(existingRequest.status).toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        Requested on {existingRequest.requestedAt ? new Date(existingRequest.requestedAt).toLocaleString() : 'N/A'}
+                      </p>
+                      {existingRequest.status === 'rejected' && existingRequest.rejectionReason && (
+                        <p className="mt-2 text-sm text-red-600">
+                          Rejection reason: {existingRequest.rejectionReason}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {(!existingRequest || existingRequest.status === 'rejected' || existingRequest.status === 'none') ? (
+                    <form onSubmit={handleRequestSubmit} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Why do you want faculty role?</label>
+                        <textarea
+                          rows={4}
+                          value={requestFormData.reason}
+                          onChange={(e) => setRequestFormData((prev) => ({ ...prev, reason: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                          placeholder="Explain your motivation and how you can contribute..."
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center justify-between gap-3 mb-2">
+                          <label className="block text-sm font-semibold text-slate-700">Qualifications / Experience</label>
+                        </div>
+                        <textarea
+                          rows={4}
+                          value={requestFormData.qualifications}
+                          onChange={(e) => setRequestFormData((prev) => ({ ...prev, qualifications: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400"
+                          placeholder="Share relevant teaching background, certifications, achievements..."
+                        />
+                        <div className="mt-2 flex items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <label
+                              htmlFor="faculty-request-pdf"
+                              className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer"
+                              title="Upload PDF (max 5MB)"
+                            >
+                              <Plus size={16} />
+                            </label>
+                            <input
+                              id="faculty-request-pdf"
+                              type="file"
+                              accept="application/pdf,.pdf"
+                              onChange={handlePdfSelect}
+                              className="hidden"
+                            />
+                          </div>
+                          <p className="text-xs text-slate-500">Upload: PDF only, maximum size 5MB</p>
+                        </div>
+                        {requestPdfFile && (
+                          <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                            <p className="text-xs text-slate-700 truncate">
+                              {requestPdfFile.name} ({(requestPdfFile.size / (1024 * 1024)).toFixed(2)} MB)
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setRequestPdfFile(null)}
+                              className="text-xs font-semibold text-red-600 hover:text-red-700"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setRequestModalOpen(false)}
+                          className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={requestSubmitting}
+                          className="px-5 py-2 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          {requestSubmitting ? 'Submitting...' : 'Submit Request'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800 text-sm">
+                      Your request is currently under review. You can close this popup and check status later.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

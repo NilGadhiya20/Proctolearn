@@ -34,7 +34,7 @@ export const sendQuizAnnouncement = async (req, res) => {
     const students = await User.find({ 
       _id: { $in: enrolledStudentIds },
       role: 'student'
-    }).select('email firstName');
+    }).select('email firstName preferences.emailNotifications');
 
     const result = await notifyNewQuiz(
       quizId,
@@ -75,7 +75,7 @@ export const scheduleQuizReminderEmail = async (req, res) => {
     const students = await User.find({ 
       _id: { $in: enrolledStudentIds },
       role: 'student'
-    }).select('email firstName');
+    }).select('email firstName preferences.emailNotifications');
 
     const result = await scheduleQuizReminder(quizId, students, reminderTime);
 
@@ -110,7 +110,7 @@ export const sendQuizUpdateNotification = async (req, res) => {
     const students = await User.find({ 
       _id: { $in: enrolledStudentIds },
       role: 'student'
-    }).select('email firstName');
+    }).select('email firstName preferences.emailNotifications');
 
     const result = await notifyQuizUpdate(quizId, updateMessage, students);
 
@@ -278,7 +278,7 @@ export const sendGradesNotification = async (req, res) => {
     const students = await User.find({ 
       _id: { $in: studentIds },
       role: 'student'
-    }).select('email firstName');
+    }).select('email firstName preferences.emailNotifications');
 
     const result = await notifyContentUpdate(
       'gradeRelease',

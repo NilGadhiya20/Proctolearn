@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, Users, BarChart3, Lock, CheckCircle, Clock, Shield, Award, Video, FileText, Zap, LogIn, HelpCircle, Home, CreditCard, BookOpen, UserPlus, GraduationCap } from 'lucide-react';
+import { Eye, Users, BarChart3, Lock, CheckCircle, Clock, Shield, Award, Video, FileText, Zap, LogIn, HelpCircle, Home, CreditCard, BookOpen, UserPlus, GraduationCap, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { useAuthStore } from '../context/store';
 import { useEscapeKey, useFocusTrap } from '../hooks/useKeyboardNavigation';
 import LandingNavbar from '../components/Layout/LandingNavbar';
@@ -749,13 +749,13 @@ const Landing = () => {
             <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-12">
               <Link 
                 to="/register"
-                className="bg-white text-emerald-600 font-bold px-14 py-6 rounded-2xl text-xl shadow-2xl hover:shadow-[0_25px_70px_rgba(255,255,255,0.7)] hover:scale-115 hover:-translate-y-2 transition-all duration-500 inline-flex items-center gap-2 active:scale-95 relative overflow-hidden group"
+                className="bg-white text-emerald-700 font-bold px-14 py-6 rounded-2xl text-xl shadow-2xl border-2 border-white/80 hover:text-white hover:border-emerald-200 hover:shadow-[0_28px_80px_rgba(16,185,129,0.55)] hover:scale-110 hover:-translate-y-2 transition-all duration-500 inline-flex items-center gap-2 active:scale-95 relative overflow-hidden group focus:outline-none focus-visible:ring-4 focus-visible:ring-white/70"
               >
                 <span className="relative z-10 flex items-center gap-2">
                   Sign Up Now
                   <CheckCircle className="w-6 h-6 group-hover:rotate-12 transition-transform duration-300" />
                 </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-emerald-100 to-lime-100 translate-y-full group-hover:translate-y-0 transition-transform duration-400"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-lime-500 translate-y-full group-hover:translate-y-0 transition-transform duration-400"></div>
               </Link>
               <Link
                 to="/login"
@@ -792,11 +792,24 @@ const Landing = () => {
                 AI-Powered Proctored Assessment Platform - Making online education secure, transparent and accountable.
               </p>
               <div className="flex gap-3">
-                {['facebook-f', 'twitter', 'instagram', 'linkedin-in'].map((social) => (
-                  <a key={social} href="#" className="w-12 h-12 rounded-lg bg-slate-800 hover:bg-gradient-to-r hover:from-emerald-600 hover:to-lime-500 flex items-center justify-center transition-all duration-300 hover:scale-125 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/30 active:scale-95">
-                    <i className={`fab fa-${social} text-sm`}></i>
+                {[
+                  { name: 'Facebook', icon: Facebook },
+                  { name: 'Twitter', icon: Twitter },
+                  { name: 'Instagram', icon: Instagram },
+                  { name: 'LinkedIn', icon: Linkedin }
+                ].map((social) => {
+                  const Icon = social.icon;
+                  return (
+                  <a
+                    key={social.name}
+                    href="#"
+                    aria-label={social.name}
+                    className="w-12 h-12 rounded-lg bg-slate-800/95 border border-slate-700 text-slate-200 hover:text-white hover:border-emerald-400 hover:bg-gradient-to-r hover:from-emerald-600 hover:to-lime-500 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:-translate-y-1 hover:shadow-xl hover:shadow-emerald-500/35 active:scale-95"
+                  >
+                    <Icon className="w-4 h-4" />
                   </a>
-                ))}
+                );
+                })}
               </div>
             </div>
 

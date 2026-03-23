@@ -1,21 +1,39 @@
 import Subscriber from '../models/Subscriber.js';
+import User from '../models/User.js';
 import { sendSubscriptionConfirmationEmail, sendUnsubscribeConfirmationEmail, sendNewsletterEmail } from '../utils/emailService.js';
 
 // Subscribe to mailing list
 export const subscribeToNewsletter = async (req, res) => {
   try {
     const { email, name, preferences, source } = req.body;
+    const normalizedEmail = email?.toLowerCase().trim();
 
     // Validate email
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ 
         success: false, 
         message: 'Email is required' 
       });
     }
 
+    // Allow subscriptions only for registered users
+    const existingUser = await User.findOne({ email: normalizedEmail, isActive: true })
+      .select('firstName lastName email');
+
+    if (!existingUser) {
+      return res.status(403).json({
+        success: false,
+        requiresAccount: true,
+        redirectTo: '/register',
+        message: 'To subscribe for updates, please create an account first.'
+      });
+    }
+
+    const resolvedName =
+      name?.trim() || `${existingUser.firstName || ''} ${existingUser.lastName || ''}`.trim();
+
     // Check if already subscribed
-    let subscriber = await Subscriber.findOne({ email: email.toLowerCase() });
+    let subscriber = await Subscriber.findOne({ email: normalizedEmail });
 
     if (subscriber) {
       // If previously unsubscribed, reactivate
@@ -23,7 +41,7 @@ export const subscribeToNewsletter = async (req, res) => {
         await subscriber.resubscribe();
         
         // Send welcome back email
-        await sendSubscriptionConfirmationEmail(email, name || subscriber.name);
+        await sendSubscriptionConfirmationEmail(normalizedEmail, resolvedName || subscriber.name);
 
         return res.status(200).json({
           success: true,
@@ -51,8 +69,8 @@ export const subscribeToNewsletter = async (req, res) => {
 
     // Create new subscriber
     const subscriberData = {
-      email: email.toLowerCase(),
-      name: name || '',
+      email: normalizedEmail,
+      name: resolvedName || '',
       source: source || 'website',
       preferences: preferences || {
         quizUpdates: true,
@@ -71,7 +89,7 @@ export const subscribeToNewsletter = async (req, res) => {
     await subscriber.save();
 
     // Send subscription confirmation email
-    const emailResult = await sendSubscriptionConfirmationEmail(email, name);
+    const emailResult = await sendSubscriptionConfirmationEmail(normalizedEmail, resolvedName);
 
     if (emailResult.success) {
       await subscriber.incrementEmailCount();
