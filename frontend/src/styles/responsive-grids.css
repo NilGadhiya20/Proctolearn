@@ -1,0 +1,400 @@
+/* Responsive Grid System for Dashboards */
+
+/* Mobile-first approach */
+@media (max-width: 640px) {
+  /* Force single column on mobile */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .sm\:grid-cols-2,
+  .md\:grid-cols-3,
+  .lg\:grid-cols-4,
+  .xl\:grid-cols-2,
+  .xl\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stat cards - single column */
+  .stat-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  /* Dashboard grid adjustments */
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  /* Quiz list - single column */
+  .quiz-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Better spacing on mobile */
+  .dashboard-card {
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  /* Reduce content padding */
+  .dashboard-content {
+    padding: 1rem;
+  }
+
+  /* Make tables scrollable on mobile */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100vw;
+  }
+
+  /* Reduce chart container padding */
+  .chart-container {
+    padding: 0.75rem;
+  }
+
+  /* Stack form fields */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Adjust hero section on mobile */
+  .header-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .header-buttons button {
+    width: 100%;
+  }
+}
+
+/* Tablet adjustments (641px - 1024px) */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .stat-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .quiz-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* 2-column layout on tablet for analytics */
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem;
+  }
+
+  .xl\:grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .xl\:col-span-2 {
+    grid-column: auto !important;
+  }
+}
+
+/* Desktop (1025px+) */
+@media (min-width: 1025px) {
+  .stat-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5rem;
+  }
+
+  .analytics-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Flexible dashboard layout */
+.dashboard-layout {
+  display: grid;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .dashboard-layout {
+    gap: 1rem;
+  }
+}
+
+/* Secondary metrics grid */
+.metrics-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Recent activity cards */
+.activity-card {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  transition: all 0.3s ease;
+}
+
+@media (max-width: 640px) {
+  .activity-card {
+    padding: 0.75rem;
+    gap: 0.75rem;
+  }
+
+  .activity-card-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+
+  .activity-card-content h4 {
+    font-size: 0.875rem;
+  }
+
+  .activity-card-content p {
+    font-size: 0.75rem;
+  }
+}
+
+/* Responsive table styling */
+@media (max-width: 768px) {
+  table {
+    font-size: 0.875rem;
+  }
+
+  th, td {
+    padding: 0.5rem !important;
+  }
+
+  /* Hide less important columns on small screens */
+  .hide-on-mobile {
+    display: none;
+  }
+
+  /* Stack data better */
+  tr {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+
+  td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    margin-right: 1rem;
+    min-width: 100px;
+  }
+}
+
+/* Quiz/Card grids - better wrapping */
+.quiz-cards-grid,
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .quiz-cards-grid,
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .quiz-cards-grid,
+  .card-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* Button groups - stack on mobile */
+.button-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .button-group {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .button-group button,
+  .button-group a {
+    width: 100%;
+  }
+}
+
+/* Form field groups */
+.form-group-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .form-group-row {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+}
+
+/* Hero/Header section */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .page-header-title {
+    width: 100%;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .page-header-actions button {
+    width: 100%;
+  }
+}
+
+/* Two-column responsive layout */
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Three-column responsive layout */
+.three-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .three-column {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .three-column {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Charts responsive height */
+.chart-wrapper {
+  width: 100%;
+  min-height: 300px;
+}
+
+@media (max-width: 768px) {
+  .chart-wrapper {
+    min-height: 250px;
+  }
+}
+
+@media (max-width: 640px) {
+  .chart-wrapper {
+    min-height: 200px;
+  }
+}
+
+/* Add padding-aware stacking */
+@media (max-width: 640px) {
+  .container-with-padding {
+    padding: 1rem;
+  }
+
+  .content-wrapper {
+    padding: 0.5rem;
+    margin: 0;
+  }
+}
+
+/* Ensure TextFields scale properly */
+.MuiTextField-root {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .MuiTextField-root {
+    margin-bottom: 0.75rem !important;
+  }
+}
+
+/* Better spacing for lists on mobile */
+.list-item {
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .list-item {
+    padding: 0.5rem;
+  }
+}
+
+/* Ensure modals/dialogs are full-width on mobile */
+@media (max-width: 640px) {
+  .MuiDialog-paper,
+  .modal-container {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: auto !important;
+    border-radius: 0.75rem !important;
+  }
+}
