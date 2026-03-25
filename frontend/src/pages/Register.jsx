@@ -361,7 +361,7 @@ const Register = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:shadow-[0_15px_40px_rgba(5,150,105,0.35)] hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all duration-300 hover:shadow-[0_15px_40px_rgba(5,150,105,0.35)] hover:bg-emerald-700 hover:scale-[1.02] active:scale-95 disabled:opacity-60 min-h-[44px]"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
               </button>
@@ -376,7 +376,7 @@ const Register = () => {
                     type="button"
                     onClick={handleGoogleAuth}
                     disabled={oauthLoading}
-                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-300 hover:shadow-[0_10px_25px_rgba(15,23,42,0.12)] hover:border-emerald-300 hover:bg-emerald-50/30 hover:scale-[1.02] active:scale-95 disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-800 shadow-sm transition-all duration-300 hover:shadow-[0_10px_25px_rgba(15,23,42,0.12)] hover:border-emerald-300 hover:bg-emerald-50/30 hover:scale-[1.02] active:scale-95 disabled:opacity-60 min-h-[44px]"
                   >
                     <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="h-5 w-5" />
                     {oauthLoading ? 'Connecting to Google...' : 'Continue with Google'}
@@ -433,9 +433,9 @@ function Field({ label, name, value, onChange, error, icon, as, options, type = 
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
-            className={`w-full flex items-center gap-2 rounded-xl border-2 transition-all duration-300 ${
+            className={`w-full flex items-center gap-2 rounded-xl border-2 transition-all duration-300 min-h-[44px] ${
               error ? 'border-rose-300 bg-rose-50/30' : isOpen ? 'border-emerald-500 bg-emerald-50/50' : 'border-emerald-200 bg-gradient-to-r from-white to-emerald-50/40'
-            } px-3 py-2.5 shadow-sm focus:outline-none focus:ring-2 ${error ? 'focus:ring-rose-200' : 'focus:ring-emerald-200'} hover:border-emerald-400 hover:shadow-md`}>
+            } px-3 py-3 shadow-sm focus:outline-none focus:ring-2 ${error ? 'focus:ring-rose-200' : 'focus:ring-emerald-200'} hover:border-emerald-400 hover:shadow-md`}>
             <div className="flex-1 flex items-center gap-2 text-left">
               {selectedOption?.icon && <span className="text-emerald-600">{selectedOption.icon}</span>}
               <span className="text-sm font-medium text-slate-900">{selectedOption?.label || label}</span>
@@ -499,9 +499,9 @@ function Field({ label, name, value, onChange, error, icon, as, options, type = 
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}{required && <span className="text-rose-500 ml-1">*</span>}
-      <div className={`mt-1 flex items-center gap-2 rounded-xl border-2 transition-all duration-300 ${
+      <div className={`mt-1 flex items-center gap-2 rounded-xl border-2 transition-all duration-300 min-h-[44px] ${
         error ? 'border-rose-300 bg-rose-50/30 focus-within:ring-rose-200' : 'border-emerald-200 bg-gradient-to-r from-white to-emerald-50/40 focus-within:ring-emerald-200'
-      } px-3 py-2.5 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 hover:border-emerald-400 hover:shadow-md hover:scale-[1.01] group`}>
+      } px-3 py-3 shadow-sm focus-within:border-emerald-500 focus-within:ring-2 hover:border-emerald-400 hover:shadow-md hover:scale-[1.01] group`}>
         {icon && <span className={`transition-colors duration-300 ${error ? 'text-rose-400' : 'text-emerald-600 group-hover:text-emerald-700'}`}>{icon}</span>}
         <input
           type={type}
