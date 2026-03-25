@@ -23,7 +23,6 @@ import '../styles/dashboards.css';
 import '../styles/mobile-sidebar.css';
 import '../styles/enhanced-dashboard.css';
 import '../styles/dark-mode.css';
-import '../styles/mobile-buttons.css';
 import NotificationsDropdown from '../components/Common/NotificationsDropdown';
 import DashboardSidebar from '../components/Layout/DashboardSidebar';
 import HamburgerMenu from '../components/Layout/HamburgerMenu';
@@ -411,7 +410,7 @@ const AdminDashboard = () => {
                   onClick={() => navigate('/create-quiz')}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="btn-primary inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold shadow-lg min-h-[44px]"
+                  className="btn-primary inline-flex items-center gap-2 px-5 py-3 rounded-xl font-semibold shadow-lg"
                 >
                   <Plus size={20} strokeWidth={2.5} />
                   <span>Create Quiz</span>
@@ -420,7 +419,7 @@ const AdminDashboard = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => downloadCSV(allUsers, 'dashboard-export.csv')}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm min-h-[44px]"
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-white border-2 border-slate-200 text-slate-700 rounded-xl font-semibold hover:border-indigo-300 hover:bg-indigo-50 transition-all shadow-sm"
                 >
                   <Download size={18} strokeWidth={2.5} />
                   <span>Export</span>
@@ -430,8 +429,8 @@ const AdminDashboard = () => {
 
             {activeTab === 'overview' && (
               <>
-                {/* Stats Grid - Mobile-optimized responsive */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                {/* Stats Grid - Modern Gradient Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                   {loading ? (
                     <SkeletonLoader type="stat-card" count={4} />
                   ) : (
@@ -454,7 +453,7 @@ const AdminDashboard = () => {
                 {/* Secondary Metrics Bar */}
                 <motion.div 
                   variants={itemVariants} 
-                  className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3"
+                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
                 >
                   {loading ? (
                     <SkeletonLoader type="mini-card" count={4} />
@@ -514,7 +513,7 @@ const AdminDashboard = () => {
                       <p className="text-sm text-slate-500 mb-4">Create your first quiz to get started</p>
                       <button
                         onClick={() => navigate('/create-quiz')}
-                        className="btn-primary inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold min-h-[44px]"
+                        className="btn-primary inline-flex items-center gap-2 px-4 py-2 rounded-lg font-semibold"
                       >
                         <Plus className="h-4 w-4" />
                         Create Quiz
@@ -583,7 +582,7 @@ const AdminDashboard = () => {
                 </motion.div>
 
                 {/* Platform Analytics - User Growth & Quiz Creation */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {loading ? (
                     <>
                       <SkeletonLoader type="chart" />
@@ -665,7 +664,7 @@ const AdminDashboard = () => {
                 )}
 
                 {/* Platform Analytics - User Growth & Quiz Creation */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4 md:gap-5 lg:gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {loading ? (
                     <>
                       <SkeletonLoader type="chart" />
@@ -757,7 +756,7 @@ const AdminDashboard = () => {
                 )}
                 
                 {/* Charts Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {loading ? (
                     <>
                       <SkeletonLoader type="chart" />
@@ -787,7 +786,7 @@ const AdminDashboard = () => {
                 </div>
 
                 {/* Recent Activity / Tables */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-5 lg:gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Recent Users Table */}
                   <div className="lg:col-span-2">
                     {loading ? (

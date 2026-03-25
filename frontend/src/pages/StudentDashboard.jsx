@@ -43,7 +43,6 @@ import api from '../services/api';
 import socket from '../socket';
 import '../styles/dashboards.css';
 import '../styles/dark-mode.css';
-import '../styles/mobile-buttons.css';
 
 // Register ChartJS components
 ChartJS.register(
@@ -724,7 +723,7 @@ const StudentDashboard = () => {
             {/* Charts Section */}
             <div
               ref={(el) => { sectionRefs.current.progress = el; }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 lg:gap-8 mb-8"
+              className="grid grid-cols-1 xl:grid-cols-2 gap-6 lg:gap-8 mb-8"
             >
               
               {/* Performance Chart */}

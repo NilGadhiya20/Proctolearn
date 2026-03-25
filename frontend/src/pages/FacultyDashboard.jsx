@@ -10,7 +10,7 @@ import { ResponsivePageLayout } from '../components/Layout/ResponsivePageLayout'
 import { useAuthStore } from '../context/store';
 import '../styles/dashboards.css';
 import '../styles/dark-mode.css';
-import '../styles/mobile-buttons.css';
+import '../styles/dashboards.css';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -225,7 +225,7 @@ const FacultyDashboard = () => {
           </motion.div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
               { title: 'My Quizzes', value: liveStats?.myQuizzes ?? stats.myQuizzes, icon: BookOpen, color: 'green' },
               { title: 'Active Students', value: activeStudents, icon: Users, color: 'emerald', live: true },

@@ -180,12 +180,12 @@ export default function Login() {
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       
       let errorMsg = 'Login failed. Please check your credentials.';
       
       if (error.message === 'Network Error') {
-        errorMsg = 'Unable to connect to server. Please try again later.';
+        errorMsg = '❌ Unable to connect to server. Please try again later.';
       } else if (error.response?.status === 401) {
         // Handle 401 specifically - invalid credentials
         const backendMsg = error.response?.data?.message || '';
@@ -193,20 +193,20 @@ export default function Login() {
             backendMsg.toLowerCase().includes('incorrect') ||
             backendMsg.toLowerCase().includes('password') ||
             backendMsg.toLowerCase().includes('email')) {
-          errorMsg = 'Invalid email or password. Please try again.';
+          errorMsg = '❌ Invalid email or password. Please try again.';
         } else if (role === 'admin' && backendMsg.toLowerCase().includes('code')) {
-          errorMsg = 'Invalid admin code. Please check and try again.';
+          errorMsg = '❌ Invalid admin code. Please check and try again.';
         } else {
-          errorMsg = backendMsg;
+          errorMsg = '❌ ' + backendMsg;
         }
       } else if (error.response?.status === 403) {
         // Handle 403 specifically - role mismatch
         const backendMsg = error.response?.data?.message || '';
-        errorMsg = backendMsg;
+        errorMsg = '❌ ' + backendMsg;
       } else if (error.response?.status === 404) {
-        errorMsg = 'Account not found. Please sign up first.';
+        errorMsg = '❌ Account not found. Please sign up first.';
       } else if (error.response?.data?.message) {
-        errorMsg = error.response.data.message;
+        errorMsg = '❌ ' + error.response.data.message;
       }
       
       toast.error(errorMsg, {
@@ -546,7 +546,7 @@ export default function Login() {
 
                   {/* Email/Password Form */}
                   <form onSubmit={(e) => handleSubmit(e, 'student')}>
-                    <div className="mb-2 sm:mb-3">
+                    <div className="mb-2.5 sm:mb-3">
                       <label htmlFor="studentEmail" className="block text-[10px] sm:text-xs font-bold text-slate-600 uppercase mb-1.5 sm:mb-2">Email Address<span className="text-rose-500 ml-1">*</span></label>
                       <div className="relative">
                       <svg className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-teal-600 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
@@ -556,7 +556,7 @@ export default function Login() {
                           id="studentEmail"
                           name="studentEmail"
                           type="email" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]"
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-sm sm:text-base"
                           placeholder="student@proctolearn.edu"
                           value={formData.studentEmail}
                           onChange={handleInputChange}
@@ -571,7 +571,7 @@ export default function Login() {
                           type="button"
                           onClick={() => handleForgotPassword(formData.studentEmail, 'student')}
                           disabled={loading}
-                          className="text-[10px] sm:text-xs text-teal-600 hover:text-teal-700 font-semibold relative group disabled:opacity-50 px-2 py-1"
+                          className="text-[10px] sm:text-xs text-teal-600 hover:text-teal-700 font-semibold relative group disabled:opacity-50"
                         ><span className="absolute bottom-0 left-0 w-0 bg-teal-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                           Forgot password?
                         </button>
@@ -584,7 +584,7 @@ export default function Login() {
                           id="studentPassword"
                           name="studentPassword"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]"
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-teal-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(20,184,166,0.1)] transition-all duration-300 font-medium text-sm sm:text-base"
                           value={formData.studentPassword}
                           onChange={handleInputChange}
                         />
@@ -594,7 +594,7 @@ export default function Login() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-teal-700 to-teal-500 text-white py-3 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-teal-800 hover:to-teal-600 transition-all duration-300 shadow-lg shadow-teal-700/30 hover:shadow-[0_15px_40px_rgba(20,184,166,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-base min-h-[44px]"
+                      className="w-full bg-gradient-to-r from-teal-700 to-teal-500 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-teal-800 hover:to-teal-600 transition-all duration-300 shadow-lg shadow-teal-700/30 hover:shadow-[0_15px_40px_rgba(20,184,166,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
@@ -654,7 +654,7 @@ export default function Login() {
                   </div>
 
                   <form onSubmit={(e) => handleSubmit(e, 'faculty')}>
-                    <div className="mb-2 sm:mb-3">
+                    <div className="mb-2.5 sm:mb-3">
                       <label htmlFor="facultyEmail" className="block text-[10px] sm:text-xs font-bold text-slate-600 uppercase mb-1.5 sm:mb-2">Faculty Email<span className="text-rose-500 ml-1">*</span></label>
                       <div className="relative">
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-green-600 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
@@ -664,7 +664,7 @@ export default function Login() {
                           id="facultyEmail"
                           name="facultyEmail"
                           type="email" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-sm sm:text-base" 
                           placeholder="faculty@proctolearn.edu"
                           value={formData.facultyEmail}
                           onChange={handleInputChange}
@@ -679,7 +679,7 @@ export default function Login() {
                           type="button"
                           onClick={() => handleForgotPassword(formData.facultyEmail, 'faculty')}
                           disabled={loading}
-                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold relative group disabled:opacity-50 px-2 py-1"
+                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold relative group disabled:opacity-50"
                         ><span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
                           Forgot password?
                         </button>
@@ -692,7 +692,7 @@ export default function Login() {
                           id="facultyPassword"
                           name="facultyPassword"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-sm sm:text-base" 
                           value={formData.facultyPassword}
                           onChange={handleInputChange}
                         />
@@ -702,7 +702,7 @@ export default function Login() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-green-700 to-teal-600 text-white py-3 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-teal-700 transition-all duration-300 shadow-lg shadow-green-700/30 hover:shadow-[0_15px_40px_rgba(34,197,94,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-base min-h-[44px]"
+                      className="w-full bg-gradient-to-r from-green-700 to-teal-600 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-teal-700 transition-all duration-300 shadow-lg shadow-green-700/30 hover:shadow-[0_15px_40px_rgba(34,197,94,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
@@ -736,7 +736,7 @@ export default function Login() {
                   <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-3 sm:mb-4">Admin Login</h3>
 
                   <form onSubmit={(e) => handleSubmit(e, 'admin')}>
-                    <div className="mb-2 sm:mb-3">
+                    <div className="mb-2.5 sm:mb-3">
                       <label htmlFor="adminEmail" className="block text-[10px] sm:text-xs font-bold text-slate-600 uppercase mb-1.5 sm:mb-2">Admin Email<span className="text-green-600 ml-1">*</span></label>
                       <div className="relative">
                         <svg className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-green-600 pointer-events-none" fill="currentColor" viewBox="0 0 24 24">
@@ -746,7 +746,7 @@ export default function Login() {
                           id="adminEmail"
                           name="adminEmail"
                           type="email" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 transition font-medium text-sm sm:text-base" 
                           placeholder="admin@proctolearn.edu"
                           value={formData.adminEmail}
                           onChange={handleInputChange}
@@ -754,15 +754,15 @@ export default function Login() {
                       </div>
                     </div>
                     
-                    <div className="mb-2 sm:mb-3">
+                    <div className="mb-2.5 sm:mb-3">
                       <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                         <label htmlFor="adminPassword" className="text-[10px] sm:text-xs font-bold text-slate-600 uppercase">Password<span className="text-green-600 ml-1">*</span></label>
                         <button 
                           type="button"
                           onClick={() => handleForgotPassword(formData.adminEmail, 'admin')}
                           disabled={loading}
-                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold relative group disabled:opacity-50 px-2 py-1"
-                        ><span className="absolute bottom-0 left-0 w-0 bg-green-600 h-0.5 group-hover:w-full transition-all duration-300 ease-out"></span>
+                          className="text-[10px] sm:text-xs text-green-600 hover:text-green-700 font-semibold hover:underline disabled:opacity-50"
+                        >
                           Forgot password?
                         </button>
                       </div>
@@ -774,7 +774,7 @@ export default function Login() {
                           id="adminPassword"
                           name="adminPassword"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 transition font-medium text-sm sm:text-base" 
                           value={formData.adminPassword}
                           onChange={handleInputChange}
                         />
@@ -791,7 +791,7 @@ export default function Login() {
                           id="adminCode"
                           name="adminCode"
                           type="password" 
-                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-3 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500 focus:ring-opacity-20 focus:shadow-[0_0_0_3px_rgba(34,197,94,0.1)] transition-all duration-300 font-medium text-base sm:text-base min-h-[44px]" 
+                          className="w-full pl-9 sm:pl-11 pr-3 sm:pr-4 py-2.5 sm:py-3 bg-white border border-green-200 sm:border-2 rounded-lg sm:rounded-xl outline-none focus:border-green-500 transition font-medium text-sm sm:text-base" 
                           placeholder="Secure admin access code"
                           value={formData.adminCode}
                           onChange={handleInputChange}
@@ -802,7 +802,7 @@ export default function Login() {
                     <button 
                       type="submit"
                       disabled={loading}
-                      className="w-full bg-gradient-to-r from-green-700 to-green-500 text-white py-3 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-green-600 transition-all duration-300 shadow-lg shadow-green-700/30 hover:shadow-[0_15px_40px_rgba(34,197,94,0.35)] transform hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-base sm:text-base min-h-[44px]"
+                      className="w-full bg-gradient-to-r from-green-700 to-green-500 text-white py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-bold hover:from-green-800 hover:to-green-600 transition shadow-lg shadow-green-700/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                     >
                       <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />

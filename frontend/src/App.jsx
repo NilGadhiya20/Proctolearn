@@ -12,8 +12,6 @@ import { PageTransitionLoader } from './components';
 
 // Import accessibility styles
 import './styles/accessibility.css';
-import './styles/mobile-buttons.css';
-import './styles/responsive-grids.css';
 
 // Pages
 import Landing from './pages/Landing';

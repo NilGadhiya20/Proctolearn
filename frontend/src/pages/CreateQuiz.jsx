@@ -47,7 +47,6 @@ import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import RemoveCircleIcon from '@mui/icons-material/RemoveCircle';
 import { Plus, Trash2, Check, AlertCircle, Eye, Calendar, Clock } from 'lucide-react';
-import '../styles/mobile-buttons.css';
 
 const CreateQuiz = () => {
   const navigate = useNavigate();
