@@ -41,15 +41,17 @@ const server = http.createServer(app);
 // Middleware
 app.use(helmet());
 app.use(morgan('dev'));
+const corsOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  process.env.FRONTEND_URL,
+  ...(process.env.CORS_ORIGIN || '').split(',').map((origin) => origin.trim())
+].filter(Boolean);
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      process.env.FRONTEND_URL || ''
-    ].filter(Boolean),
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -77,6 +79,14 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: 'Server is running',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Root route (helps Render/Vercel base URL checks)
+app.get('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Proctolearn API running. Use /api/health for status.'
   });
 });
 
