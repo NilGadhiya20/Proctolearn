@@ -44,7 +44,7 @@ router.get('/queue-status', getQueueStatus);
 // Send grades released notification
 router.post('/grades-notification/:quizId', sendGradesNotification);
 
-// Cross-device notification feed
+// Persistent notification feed & read tracking
 router.get('/feed', getMyNotifications);
 router.patch('/read/:notificationId', markNotificationRead);
 router.patch('/read-all', markAllNotificationsRead);

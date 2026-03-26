@@ -93,7 +93,7 @@ const NotificationsDropdown = () => {
     }
   }, [user]);
 
-  // Fetch existing notification feed and register the socket notification channel
+  // Load persisted notifications and register socket channel (works across devices)
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
@@ -102,11 +102,9 @@ const NotificationsDropdown = () => {
       try {
         const feed = await fetchNotificationFeed();
         if (!isMounted) return;
-
         const normalized = feed.map((item) => normalizeIncomingNotification({ ...item, read: item.read }));
         setNotifications(normalized);
-        const unread = normalized.filter((n) => !n.read).length;
-        setUnreadCount(unread);
+        setUnreadCount(normalized.filter((n) => !n.read).length);
       } catch (error) {
         console.error('Failed to load notification feed:', error);
       }
@@ -320,7 +318,7 @@ const NotificationsDropdown = () => {
     // Cleanup
     return () => {
       isMounted = false;
-       socket.off('notification');
+      socket.off('notification');
       socket.off('activity-logged');
       socket.off('alert');
       socket.off('submission-complete');
