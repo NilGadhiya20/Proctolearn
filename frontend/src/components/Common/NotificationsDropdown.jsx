@@ -23,6 +23,11 @@ import {
 import socket from '../../socket';
 import { useAuthStore } from '../../context/store';
 import { getAllQuizzes } from '../../services/quizService';
+import {
+  fetchNotificationFeed,
+  markNotificationRead as markNotificationReadApi,
+  markAllNotificationsRead as markAllNotificationsReadApi
+} from '../../services/notificationService';
 import { formatDistanceToNow } from 'date-fns';
 
 const NotificationsDropdown = () => {
@@ -43,6 +48,24 @@ const NotificationsDropdown = () => {
       .replace(/\s+/g, ' ')
       .trim()
       .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const normalizeIncomingNotification = (notification) => {
+    const rawTimestamp = notification?.timestamp || notification?.createdAt;
+    const parsedTimestamp = rawTimestamp ? new Date(rawTimestamp) : new Date();
+    const serverId = notification?.id || notification?._id || notification?.serverId;
+
+    return {
+      id: serverId || `${notification?.type || 'notification'}-${parsedTimestamp.getTime()}`,
+      serverId,
+      type: notification?.type || 'system',
+      severity: notification?.severity || 'info',
+      title: notification?.title || formatLabel(notification?.type) || 'Notification',
+      message: notification?.message || notification?.body || 'You have a new notification',
+      timestamp: parsedTimestamp,
+      read: Boolean(notification?.read),
+      data: notification?.data || notification?.context || notification?.metadata || notification?.details || {}
+    };
   };
 
   // Initialize Audio Context
@@ -68,6 +91,38 @@ const NotificationsDropdown = () => {
         });
       }
     }
+  }, [user]);
+
+  // Fetch existing notification feed and register the socket notification channel
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+
+    const loadFeed = async () => {
+      try {
+        const feed = await fetchNotificationFeed();
+        if (!isMounted) return;
+
+        const normalized = feed.map((item) => normalizeIncomingNotification({ ...item, read: item.read }));
+        setNotifications(normalized);
+        const unread = normalized.filter((n) => !n.read).length;
+        setUnreadCount(unread);
+      } catch (error) {
+        console.error('Failed to load notification feed:', error);
+      }
+    };
+
+    loadFeed();
+
+    socket.emit('register-notification-channel', {
+      userId: user._id,
+      role: user.role,
+      institutionId: user.institution
+    });
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   // Play notification sound using Web Audio API
@@ -187,6 +242,11 @@ const NotificationsDropdown = () => {
     }
     joinFacultyQuizRooms();
 
+    socket.on('notification', (payload) => {
+      const normalized = normalizeIncomingNotification(payload);
+      addNotification(normalized);
+    });
+
     // Listen for quiz activities
     socket.on('activity-logged', (data) => {
       if (user.role === 'faculty' || user.role === 'admin') {
@@ -260,6 +320,7 @@ const NotificationsDropdown = () => {
     // Cleanup
     return () => {
       isMounted = false;
+       socket.off('notification');
       socket.off('activity-logged');
       socket.off('alert');
       socket.off('submission-complete');
@@ -268,13 +329,15 @@ const NotificationsDropdown = () => {
   }, [user]);
 
   // Add new notification
-  const addNotification = (notification) => {
+  const addNotification = (notification, options = {}) => {
+    const normalized = normalizeIncomingNotification(notification);
     const dedupKeyParts = [
-      notification.type,
-      notification.title,
-      notification.message,
-      notification.data?.submissionId || '',
-      notification.data?.studentId || ''
+      normalized.serverId || '',
+      normalized.type,
+      normalized.title,
+      normalized.message,
+      normalized.data?.submissionId || normalized.data?.submission || '',
+      normalized.data?.studentId || normalized.data?.student || ''
     ];
     const dedupKey = dedupKeyParts.join('|');
     const now = Date.now();
@@ -297,36 +360,39 @@ const NotificationsDropdown = () => {
     }
 
     const newNotification = {
-      id: Date.now() + Math.random(),
       read: false,
-      ...notification
+      ...normalized
     };
 
     setNotifications(prev => [newNotification, ...prev].slice(0, 50)); // Keep last 50
-    setUnreadCount(prev => prev + 1);
+    setUnreadCount(prev => prev + (newNotification.read ? 0 : 1));
 
-    // Play notification sound
-    playNotificationSound(notification.severity);
+    if (!options.silent) {
+      playNotificationSound(normalized.severity);
+      showBrowserNotification(newNotification);
 
-    // Show browser push notification
-    showBrowserNotification(newNotification);
-
-    // Auto-dismiss low severity notifications after 10 seconds
-    if (notification.severity === 'low' || notification.severity === 'info') {
-      setTimeout(() => {
-        markAsRead(newNotification.id);
-      }, 10000);
+      if (normalized.severity === 'low' || normalized.severity === 'info') {
+        setTimeout(() => {
+          markAsRead(newNotification.id, newNotification.serverId);
+        }, 10000);
+      }
     }
   };
 
   // Mark notification as read
-  const markAsRead = (id) => {
+  const markAsRead = (id, serverId) => {
     setNotifications(prev =>
       prev.map(notif =>
         notif.id === id ? { ...notif, read: true } : notif
       )
     );
     setUnreadCount(prev => Math.max(0, prev - 1));
+
+    if (serverId) {
+      markNotificationReadApi(serverId).catch((error) => {
+        console.error('Failed to mark notification as read:', error);
+      });
+    }
   };
 
   // Mark all as read
@@ -335,6 +401,9 @@ const NotificationsDropdown = () => {
       prev.map(notif => ({ ...notif, read: true }))
     );
     setUnreadCount(0);
+    markAllNotificationsReadApi().catch((error) => {
+      console.error('Failed to mark all notifications as read:', error);
+    });
   };
 
   // Clear all notifications
@@ -612,7 +681,7 @@ const NotificationsDropdown = () => {
                       layout
                     >
                       <Box
-                        onClick={() => !notification.read && markAsRead(notification.id)}
+                        onClick={() => !notification.read && markAsRead(notification.id, notification.serverId)}
                         sx={{
                           p: 2,
                           cursor: notification.read ? 'default' : 'pointer',

@@ -7,6 +7,12 @@ import {
   scheduleBulkEmails,
   getEmailQueueStatus
 } from '../services/emailNotificationService.js';
+import {
+  createAndDispatchNotification,
+  fetchNotificationsForUser,
+  markNotificationRead as markNotificationReadService,
+  markAllNotificationsRead as markAllNotificationsReadService
+} from '../services/notificationService.js';
 import Quiz from '../models/Quiz.js';
 import StudentSubmission from '../models/StudentSubmission.js';
 import User from '../models/User.js';
@@ -265,6 +271,40 @@ export const getQueueStatus = async (req, res) => {
   }
 };
 
+// GET /api/notifications/feed
+export const getMyNotifications = async (req, res) => {
+  try {
+    const notifications = await fetchNotificationsForUser({ user: req.user, limit: 100 });
+    res.json({ success: true, data: notifications });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
+  }
+};
+
+// PATCH /api/notifications/read/:notificationId
+export const markNotificationRead = async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    await markNotificationReadService({ notificationId, user: req.user });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking notification read:', error);
+    res.status(500).json({ success: false, message: 'Failed to mark notification as read' });
+  }
+};
+
+// PATCH /api/notifications/read-all
+export const markAllNotificationsRead = async (req, res) => {
+  try {
+    await markAllNotificationsReadService({ user: req.user });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+    res.status(500).json({ success: false, message: 'Failed to mark notifications as read' });
+  }
+};
+
 // POST /api/notifications/send-grades-notification
 export const sendGradesNotification = async (req, res) => {
   try {
@@ -313,5 +353,8 @@ export default {
   sendBulkAnnouncementEmail,
   scheduleEmails,
   getQueueStatus,
-  sendGradesNotification
+  sendGradesNotification,
+  getMyNotifications,
+  markNotificationRead,
+  markAllNotificationsRead
 };

@@ -7,14 +7,18 @@ import {
   sendBulkAnnouncementEmail,
   scheduleEmails,
   getQueueStatus,
-  sendGradesNotification
+  sendGradesNotification,
+  getMyNotifications,
+  markNotificationRead,
+  markAllNotificationsRead
 } from '../controllers/notificationController.js';
-import { auth } from '../middleware/auth.js';
+import { auth, verifyInstitutionAccess } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All notification routes require authentication
 router.use(auth);
+router.use(verifyInstitutionAccess);
 
 // Quiz announcement - notify enrolled students
 router.post('/send-quiz-announcement/:quizId', sendQuizAnnouncement);
@@ -39,5 +43,10 @@ router.get('/queue-status', getQueueStatus);
 
 // Send grades released notification
 router.post('/grades-notification/:quizId', sendGradesNotification);
+
+// Cross-device notification feed
+router.get('/feed', getMyNotifications);
+router.patch('/read/:notificationId', markNotificationRead);
+router.patch('/read-all', markAllNotificationsRead);
 
 export default router;

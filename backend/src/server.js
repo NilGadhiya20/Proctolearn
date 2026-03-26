@@ -16,6 +16,7 @@ import institutionRoutes from './routes/institutionRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import { initSocket } from './sockets/quizSocket.js';
+import { registerSocketIO } from './utils/socketRegistry.js';
 
 // Load environment variables from .env file
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +64,7 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 // Initialize Socket.IO
 const io = initSocket(server);
+registerSocketIO(io);
 app.set('io', io);
 
 // Routes

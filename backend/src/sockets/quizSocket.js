@@ -5,6 +5,7 @@ import ActivityAnalyzer from '../utils/activityAnalyzer.js';
 import { ACTIVITY_TYPES, ALERT_SEVERITY } from '../config/constants.js';
 import User from '../models/User.js';
 import Quiz from '../models/Quiz.js';
+import { createAndDispatchNotification } from '../services/notificationService.js';
 
 export const initializeSocketIO = (server) => {
   const io = new Server(server, {
@@ -38,6 +39,14 @@ export const initializeSocketIO = (server) => {
 
   // Track active quizzes
   const activeQuizzes = new Map();
+
+  const sendPersistentNotification = async (payload) => {
+    try {
+      await createAndDispatchNotification(payload);
+    } catch (error) {
+      console.error('Failed to persist notification:', error.message);
+    }
+  };
 
   const normalizeActivityType = (rawType) => {
     const type = String(rawType || '').toLowerCase();
@@ -83,6 +92,22 @@ export const initializeSocketIO = (server) => {
 
   io.on('connection', (socket) => {
     console.log('New user connected:', socket.id);
+
+    socket.on('register-notification-channel', (data = {}) => {
+      const { userId, role, institutionId } = data;
+      const institutionKey = institutionId || 'global';
+
+      if (userId) {
+        socket.join(`user-${userId}`);
+      }
+
+      if (role) {
+        socket.join(`role-${role}-${institutionKey}`);
+        if (role === 'admin') {
+          socket.join('admins');
+        }
+      }
+    });
 
     // Join quiz room
     socket.on('join-quiz', (data) => {
@@ -234,6 +259,23 @@ export const initializeSocketIO = (server) => {
             studentEmail,
             timestamp: new Date().toISOString()
           });
+
+          await sendPersistentNotification({
+            title: 'Fullscreen Exit Detected',
+            message: `${studentName} (${studentEmail}) exited fullscreen during quiz attempt`,
+            type: 'alert',
+            severity: ALERT_SEVERITY.CRITICAL,
+            audience: {
+              roles: ['faculty', 'admin'],
+              institution: data.institutionId
+            },
+            context: {
+              quiz: quizId,
+              submission: submissionId,
+              student: data.studentId,
+              metadata: { activity: normalizedActivityType }
+            }
+          });
         }
 
         if (normalizedActivityType === ACTIVITY_TYPES.TAB_CHANGE) {
@@ -256,6 +298,23 @@ export const initializeSocketIO = (server) => {
             studentEmail,
             timestamp: new Date().toISOString()
           });
+
+          await sendPersistentNotification({
+            title: 'Tab Switch Detected',
+            message: `${studentName} (${studentEmail}) switched tab/window during quiz attempt`,
+            type: 'alert',
+            severity: ALERT_SEVERITY.HIGH,
+            audience: {
+              roles: ['faculty', 'admin'],
+              institution: data.institutionId
+            },
+            context: {
+              quiz: quizId,
+              submission: submissionId,
+              student: data.studentId,
+              metadata: { activity: normalizedActivityType }
+            }
+          });
         }
 
         if (normalizedActivityType === ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE) {
@@ -269,6 +328,23 @@ export const initializeSocketIO = (server) => {
             activity: normalizedActivityType,
             score: 75,
             message: `${studentName} (${studentEmail}) attempted page refresh/close or lost page visibility`
+          });
+
+          await sendPersistentNotification({
+            title: 'Page Visibility Lost',
+            message: `${studentName} (${studentEmail}) attempted refresh/close or lost visibility`,
+            type: 'alert',
+            severity: ALERT_SEVERITY.HIGH,
+            audience: {
+              roles: ['faculty', 'admin'],
+              institution: data.institutionId
+            },
+            context: {
+              quiz: quizId,
+              submission: submissionId,
+              student: data.studentId,
+              metadata: { activity: normalizedActivityType }
+            }
           });
         }
 
@@ -288,6 +364,23 @@ export const initializeSocketIO = (server) => {
               score: suspicionScore,
               activity: normalizedActivityType,
               message: `${studentName} (${studentEmail}) triggered suspicious activity`
+            });
+
+            await sendPersistentNotification({
+              title: 'Suspicious Activity Detected',
+              message: `${studentName} (${studentEmail}) triggered suspicious activity`,
+              type: 'alert',
+              severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
+              audience: {
+                roles: ['faculty', 'admin'],
+                institution: data.institutionId
+              },
+              context: {
+                quiz: quizId,
+                submission: submissionId,
+                student: data.studentId,
+                metadata: { activity: normalizedActivityType, suspicionScore }
+              }
             });
           }
         }
@@ -328,6 +421,23 @@ export const initializeSocketIO = (server) => {
             alertType: 'PAGE_HIDDEN',
             severity: ALERT_SEVERITY.HIGH
           });
+
+          await sendPersistentNotification({
+            title: 'Page Hidden',
+            message: `${data.studentId || 'Student'} hid or left the quiz page`,
+            type: 'alert',
+            severity: ALERT_SEVERITY.HIGH,
+            audience: {
+              roles: ['faculty', 'admin'],
+              institution: data.institutionId
+            },
+            context: {
+              quiz: data.quizId,
+              submission: submissionId,
+              student: data.studentId,
+              metadata: { activity: ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE }
+            }
+          });
         }
       } catch (error) {
         console.error('Error in visibility change:', error);
@@ -353,6 +463,22 @@ export const initializeSocketIO = (server) => {
           submissionId,
           studentId: data.studentId,
           message: 'Quiz submitted successfully'
+        });
+
+        await sendPersistentNotification({
+          title: 'Quiz Submitted',
+          message: `Student ${data.studentId} submitted quiz ${quizId}`,
+          type: 'quiz',
+          severity: 'info',
+          audience: {
+            roles: ['faculty', 'admin'],
+            institution: data.institutionId
+          },
+          context: {
+            quiz: quizId,
+            submission: submissionId,
+            student: data.studentId
+          }
         });
 
         activeQuizzes.delete(submissionId);
