@@ -1,4 +1,4 @@
-import { io } from "socket.io-client";
+import { io } from 'socket.io-client';
 
 const inferBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -11,7 +11,7 @@ const inferBaseUrl = () => {
 };
 
 const socket = io(inferBaseUrl(), {
-  transports: ["websocket"],
+  transports: ['websocket'],
 });
 
 export default socket;

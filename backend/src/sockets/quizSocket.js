@@ -5,515 +5,597 @@ import ActivityAnalyzer from '../utils/activityAnalyzer.js';
 import { ACTIVITY_TYPES, ALERT_SEVERITY } from '../config/constants.js';
 import User from '../models/User.js';
 import Quiz from '../models/Quiz.js';
-import { createAndDispatchNotification } from '../services/notificationService.js';
+import Question from '../models/Question.js';
+import { createAndDispatchNotification, upsertAlertNotification } from '../services/notificationService.js';
+import { gradeQuizAttempt } from '../utils/quizGrading.js';
 
 export const initializeSocketIO = (server) => {
-  const io = new Server(server, {
-    cors: {
-      origin: [
-        process.env.FRONTEND_URL || 'http://localhost:3000',
-        'http://localhost:5173'
-      ],
-      credentials: true
-    }
-  });
-  // Helper: compute dashboard stats (optionally scoped by institution)
-  const computeDashboardStats = async (institutionId) => {
-    const userFilter = institutionId ? { institution: institutionId } : {};
-    const quizFilter = institutionId ? { institution: institutionId } : {};
+    const io = new Server(server, {
+        cors: {
+            origin: [
+                process.env.FRONTEND_URL || 'http://localhost:3000',
+                'http://localhost:5173'
+            ],
+            credentials: true
+        }
+    });
+    // Helper: compute dashboard stats (optionally scoped by institution)
+    const computeDashboardStats = async(institutionId) => {
+        const userFilter = institutionId ? { institution: institutionId } : {};
+        const quizFilter = institutionId ? { institution: institutionId } : {};
 
-    const [facultyCount, studentCount, totalQuizzes, activeQuizzes] = await Promise.all([
-      User.countDocuments({ ...userFilter, role: 'faculty' }),
-      User.countDocuments({ ...userFilter, role: 'student' }),
-      Quiz.countDocuments({ ...quizFilter }),
-      Quiz.countDocuments({ ...quizFilter, status: { $in: ['active', 'published'] } })
-    ]);
+        const [facultyCount, studentCount, totalQuizzes, activeQuizzes] = await Promise.all([
+            User.countDocuments({...userFilter, role: 'faculty' }),
+            User.countDocuments({...userFilter, role: 'student' }),
+            Quiz.countDocuments({...quizFilter }),
+            Quiz.countDocuments({...quizFilter, status: { $in: ['active', 'published'] } })
+        ]);
 
-    return {
-      faculty: facultyCount,
-      students: studentCount,
-      totalQuizzes,
-      activeQuizzes
+        return {
+            faculty: facultyCount,
+            students: studentCount,
+            totalQuizzes,
+            activeQuizzes
+        };
     };
-  };
 
-  // Track active quizzes
-  const activeQuizzes = new Map();
+    // Track active quizzes
+    const activeQuizzes = new Map();
+    const violationCounts = new Map();
 
-  const sendPersistentNotification = async (payload) => {
-    try {
-      await createAndDispatchNotification(payload);
-    } catch (error) {
-      console.error('Failed to persist notification:', error.message);
-    }
-  };
+    const nextViolationCount = (submissionId, activity) => {
+        const key = `${submissionId || 'unknown'}:${activity}`;
+        const current = violationCounts.get(key) || 0;
+        const next = current + 1;
+        violationCounts.set(key, next);
+        return next;
+    };
 
-  const normalizeActivityType = (rawType) => {
-    const type = String(rawType || '').toLowerCase();
-
-    if (['tab_switch', 'tab-switch', 'tab_change', 'shortcut_alt_tab', 'shortcut_ctrl_tab', 'shortcut_meta_tab'].includes(type)) {
-      return ACTIVITY_TYPES.TAB_CHANGE;
-    }
-
-    if (['fullscreen_exit', 'fullscreen-exit'].includes(type)) {
-      return ACTIVITY_TYPES.FULLSCREEN_EXIT;
-    }
-
-    if (['fullscreen_enter', 'fullscreen-enter'].includes(type)) {
-      return ACTIVITY_TYPES.FULLSCREEN_ENTER;
-    }
-
-    if (['copy_attempt', 'copy', 'copy-paste', 'clipboard_blocked'].includes(type)) {
-      return ACTIVITY_TYPES.COPY_ATTEMPT;
-    }
-
-    if (['paste_attempt', 'paste'].includes(type)) {
-      return ACTIVITY_TYPES.PASTE_ATTEMPT;
-    }
-
-    if (['right_click', 'right-click', 'right_click_blocked'].includes(type)) {
-      return ACTIVITY_TYPES.RIGHT_CLICK;
-    }
-
-    if (['keyboard_shortcut', 'clipboard_shortcut_blocked'].includes(type)) {
-      return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
-    }
-
-    if (['window_blur'].includes(type)) {
-      return ACTIVITY_TYPES.WINDOW_BLUR;
-    }
-
-    if (['page_visibility_change', 'window_close_attempt', 'page_refresh', 'browser_closed', 'beforeunload'].includes(type)) {
-      return ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE;
-    }
-
-    return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
-  };
-
-  io.on('connection', (socket) => {
-    console.log('New user connected:', socket.id);
-
-    socket.on('register-notification-channel', (data = {}) => {
-      const { userId, role, institutionId } = data;
-      const institutionKey = institutionId || 'global';
-
-      if (userId) {
-        socket.join(`user-${userId}`);
-      }
-
-      if (role) {
-        socket.join(`role-${role}-${institutionKey}`);
-        if (role === 'admin') {
-          socket.join('admins');
-        }
-      }
-    });
-
-    // Join quiz room
-    socket.on('join-quiz', (data) => {
-      const { submissionId, quizId, studentId } = data;
-      socket.join(`quiz-${quizId}`);
-      if (submissionId) {
-        socket.join(`submission-${submissionId}`);
-      }
-
-      if (submissionId && studentId && !activeQuizzes.has(submissionId)) {
-        activeQuizzes.set(submissionId, {
-          submissionId,
-          quizId,
-          studentId,
-          socketId: socket.id,
-          activities: [],
-          joinedAt: new Date()
-        });
-      }
-
-      console.log(`Student ${studentId} joined quiz ${quizId}`);
-    });
-
-    // Alias: joinQuiz for compatibility with clients using camelCase
-    socket.on('joinQuiz', (payload) => {
-      if (typeof payload === 'string' || typeof payload === 'number') {
-        const quizId = payload;
-        socket.join(`quiz-${quizId}`);
-        console.log(`Joined quiz room ${quizId}`);
-        return;
-      }
-
-      const { submissionId, quizId, studentId } = payload || {};
-      if (quizId) {
-        socket.join(`quiz-${quizId}`);
-      }
-      if (submissionId) {
-        socket.join(`submission-${submissionId}`);
-        if (!activeQuizzes.has(submissionId)) {
-          activeQuizzes.set(submissionId, {
-            submissionId,
-            quizId,
-            studentId,
-            socketId: socket.id,
-            activities: [],
-            joinedAt: new Date()
-          });
-        }
-      }
-      console.log(`Student ${studentId} joined quiz ${quizId}`);
-    });
-
-    // Join admin dashboard room to receive live stats & activity
-    socket.on('join-dashboard', async (data = {}) => {
-      const { institutionId } = data;
-      socket.join('admins');
-      try {
-        const stats = await computeDashboardStats(institutionId);
-        socket.emit('dashboard-stats', { stats });
-      } catch (err) {
-        console.error('Error computing dashboard stats:', err);
-      }
-    });
-
-    // Join student dashboard notification room
-    socket.on('join-student-dashboard', (data = {}) => {
-      const { studentId, institutionId } = data;
-
-      if (studentId) {
-        socket.join(`student-${studentId}`);
-      }
-
-      if (institutionId) {
-        socket.join(`institution-${institutionId}-students`);
-      }
-    });
-
-    // Log student activity
-    socket.on('activity', async (data) => {
-      const { submissionId, quizId, activityType, details } = data;
-      const studentName = data.studentName || 'Unknown Student';
-      const studentEmail = data.studentEmail || 'No email';
-      const normalizedActivityType = normalizeActivityType(activityType);
-
-      try {
-        // Save activity to database
-        const activity = await ActivityLog.create({
-          submission: submissionId,
-          student: data.studentId,
-          quiz: quizId,
-          institution: data.institutionId,
-          activityType: normalizedActivityType,
-          severity: ActivityAnalyzer.getSeverityFromScore(0), // Initial severity
-          description: `User performed: ${normalizedActivityType}`,
-          timestamp: new Date(),
-          details,
-          ipAddress: socket.handshake.address,
-          userAgent: socket.handshake.headers['user-agent']
-        });
-
-        // Add to active quiz activities
-        const submission = activeQuizzes.get(submissionId);
-        if (submission) {
-          submission.activities.push(activity);
-        }
-
-        // Emit activity to faculty monitoring this quiz
-        io.to(`quiz-${quizId}`).emit('activity-logged', {
-          submissionId,
-          studentId: data.studentId,
-          studentName,
-          studentEmail,
-          activityType: normalizedActivityType,
-          severity: activity.severity,
-          timestamp: new Date()
-        });
-
-        // Broadcast lightweight activity feed for admins
-        io.to('admins').emit('dashboard-activity', {
-          type: activityType,
-          normalizedType: normalizedActivityType,
-          severity: activity.severity,
-          quizId,
-          submissionId,
-          studentId: data.studentId,
-          studentName,
-          studentEmail,
-          timestamp: new Date().toISOString()
-        });
-
-        // Instant faculty alerts for key proctoring events
-        if (normalizedActivityType === ACTIVITY_TYPES.FULLSCREEN_EXIT) {
-          io.to(`quiz-${quizId}`).emit('alert', {
-            submissionId,
-            studentId: data.studentId,
-            studentName,
-            studentEmail,
-            alertType: 'FULLSCREEN_EXIT',
-            severity: ALERT_SEVERITY.CRITICAL,
-            activity: normalizedActivityType,
-            score: 100,
-            message: `${studentName} (${studentEmail}) exited fullscreen during quiz attempt`
-          });
-
-          io.to(`quiz-${quizId}`).emit('fullscreenExitDetected', {
-            submissionId,
-            studentId: data.studentId,
-            studentName,
-            studentEmail,
-            timestamp: new Date().toISOString()
-          });
-
-          await sendPersistentNotification({
-            title: 'Fullscreen Exit Detected',
-            message: `${studentName} (${studentEmail}) exited fullscreen during quiz attempt`,
-            type: 'alert',
-            severity: ALERT_SEVERITY.CRITICAL,
-            audience: {
-              roles: ['faculty', 'admin'],
-              institution: data.institutionId
-            },
-            context: {
-              quiz: quizId,
-              submission: submissionId,
-              student: data.studentId,
-              metadata: { activity: normalizedActivityType }
-            }
-          });
-        }
-
-        if (normalizedActivityType === ACTIVITY_TYPES.TAB_CHANGE) {
-          io.to(`quiz-${quizId}`).emit('alert', {
-            submissionId,
-            studentId: data.studentId,
-            studentName,
-            studentEmail,
-            alertType: 'TAB_SWITCH',
-            severity: ALERT_SEVERITY.HIGH,
-            activity: normalizedActivityType,
-            score: 80,
-            message: `${studentName} (${studentEmail}) switched tab/window during quiz attempt`
-          });
-
-          io.to(`quiz-${quizId}`).emit('tabSwitchDetected', {
-            submissionId,
-            studentId: data.studentId,
-            studentName,
-            studentEmail,
-            timestamp: new Date().toISOString()
-          });
-
-          await sendPersistentNotification({
-            title: 'Tab Switch Detected',
-            message: `${studentName} (${studentEmail}) switched tab/window during quiz attempt`,
-            type: 'alert',
-            severity: ALERT_SEVERITY.HIGH,
-            audience: {
-              roles: ['faculty', 'admin'],
-              institution: data.institutionId
-            },
-            context: {
-              quiz: quizId,
-              submission: submissionId,
-              student: data.studentId,
-              metadata: { activity: normalizedActivityType }
-            }
-          });
-        }
-
-        if (normalizedActivityType === ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE) {
-          io.to(`quiz-${quizId}`).emit('alert', {
-            submissionId,
-            studentId: data.studentId,
-            studentName,
-            studentEmail,
-            alertType: 'PAGE_REFRESH_OR_CLOSE_ATTEMPT',
-            severity: ALERT_SEVERITY.HIGH,
-            activity: normalizedActivityType,
-            score: 75,
-            message: `${studentName} (${studentEmail}) attempted page refresh/close or lost page visibility`
-          });
-
-          await sendPersistentNotification({
-            title: 'Page Visibility Lost',
-            message: `${studentName} (${studentEmail}) attempted refresh/close or lost visibility`,
-            type: 'alert',
-            severity: ALERT_SEVERITY.HIGH,
-            audience: {
-              roles: ['faculty', 'admin'],
-              institution: data.institutionId
-            },
-            context: {
-              quiz: quizId,
-              submission: submissionId,
-              student: data.studentId,
-              metadata: { activity: normalizedActivityType }
-            }
-          });
-        }
-
-        // Check for suspicious activity score
-        if ([ACTIVITY_TYPES.TAB_CHANGE, ACTIVITY_TYPES.FULLSCREEN_EXIT, ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE].includes(normalizedActivityType)) {
-          const activities = submission?.activities || [];
-          const suspicionScore = ActivityAnalyzer.calculateSuspicionScore(activities, 60);
-
-          if (suspicionScore > 40) {
-            io.to(`quiz-${quizId}`).emit('alert', {
-              submissionId,
-              studentId: data.studentId,
-              studentName,
-              studentEmail,
-              alertType: 'SUSPICIOUS_ACTIVITY',
-              severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
-              score: suspicionScore,
-              activity: normalizedActivityType,
-              message: `${studentName} (${studentEmail}) triggered suspicious activity`
-            });
-
-            await sendPersistentNotification({
-              title: 'Suspicious Activity Detected',
-              message: `${studentName} (${studentEmail}) triggered suspicious activity`,
-              type: 'alert',
-              severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
-              audience: {
-                roles: ['faculty', 'admin'],
-                institution: data.institutionId
-              },
-              context: {
-                quiz: quizId,
-                submission: submissionId,
-                student: data.studentId,
-                metadata: { activity: normalizedActivityType, suspicionScore }
-              }
-            });
-          }
-        }
-
-        // Optionally refresh stats for admins (cheap enough for now)
+    const sendPersistentNotification = async(payload) => {
         try {
-          const stats = await computeDashboardStats(data.institutionId);
-          io.to('admins').emit('dashboard-stats', { stats });
-        } catch (e) {
-          // ignore stats refresh errors
+            await createAndDispatchNotification(payload);
+        } catch (error) {
+            console.error('Failed to persist notification:', error.message);
         }
-      } catch (error) {
-        console.error('Error logging activity:', error);
-      }
-    });
+    };
 
-    // Monitor page visibility changes
-    socket.on('visibility-change', async (data) => {
-      const { submissionId, isVisible } = data;
+    const normalizeActivityType = (rawType) => {
+        const type = String(rawType || '').toLowerCase();
 
-      try {
-        const activity = await ActivityLog.create({
-          submission: submissionId,
-          student: data.studentId,
-          quiz: data.quizId,
-          institution: data.institutionId,
-          activityType: ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE,
-          severity: !isVisible ? ALERT_SEVERITY.HIGH : ALERT_SEVERITY.LOW,
-          description: !isVisible ? 'Page hidden - potential cheating' : 'Page visible again',
-          timestamp: new Date(),
-          details: { isVisible }
-        });
+        if (['tab_switch', 'tab-switch', 'tab_change', 'shortcut_alt_tab', 'shortcut_ctrl_tab', 'shortcut_meta_tab'].includes(type)) {
+            return ACTIVITY_TYPES.TAB_CHANGE;
+        }
 
-        if (!isVisible) {
-          io.to(`quiz-${data.quizId}`).emit('alert', {
-            submissionId,
-            studentId: data.studentId,
-            alertType: 'PAGE_HIDDEN',
-            severity: ALERT_SEVERITY.HIGH
-          });
+        if (['fullscreen_exit', 'fullscreen-exit'].includes(type)) {
+            return ACTIVITY_TYPES.FULLSCREEN_EXIT;
+        }
 
-          await sendPersistentNotification({
-            title: 'Page Hidden',
-            message: `${data.studentId || 'Student'} hid or left the quiz page`,
-            type: 'alert',
-            severity: ALERT_SEVERITY.HIGH,
-            audience: {
-              roles: ['faculty', 'admin'],
-              institution: data.institutionId
-            },
-            context: {
-              quiz: data.quizId,
-              submission: submissionId,
-              student: data.studentId,
-              metadata: { activity: ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE }
+        if (['fullscreen_enter', 'fullscreen-enter'].includes(type)) {
+            return ACTIVITY_TYPES.FULLSCREEN_ENTER;
+        }
+
+        if (['copy_attempt', 'copy', 'copy-paste', 'clipboard_blocked'].includes(type)) {
+            return ACTIVITY_TYPES.COPY_ATTEMPT;
+        }
+
+        if (['paste_attempt', 'paste'].includes(type)) {
+            return ACTIVITY_TYPES.PASTE_ATTEMPT;
+        }
+
+        if (['right_click', 'right-click', 'right_click_blocked'].includes(type)) {
+            return ACTIVITY_TYPES.RIGHT_CLICK;
+        }
+
+        if (['keyboard_shortcut', 'clipboard_shortcut_blocked'].includes(type)) {
+            return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
+        }
+
+        if (['window_blur'].includes(type)) {
+            return ACTIVITY_TYPES.WINDOW_BLUR;
+        }
+
+        if (['page_visibility_change', 'window_close_attempt', 'page_refresh', 'browser_closed', 'beforeunload'].includes(type)) {
+            return ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE;
+        }
+
+        return ACTIVITY_TYPES.KEYBOARD_SHORTCUT;
+    };
+
+    io.on('connection', (socket) => {
+        console.log('New user connected:', socket.id);
+
+        socket.on('register-notification-channel', (data = {}) => {
+            const { userId, role, institutionId } = data;
+            const institutionKey = institutionId || 'global';
+
+            if (userId) {
+                socket.join(`user-${userId}`);
             }
-          });
-        }
-      } catch (error) {
-        console.error('Error in visibility change:', error);
-      }
-    });
 
-    // Submit Quiz
-    socket.on('submit-quiz', async (data) => {
-      const { submissionId, quizId, answers } = data;
-
-      try {
-        const submission = await StudentSubmission.findByIdAndUpdate(
-          submissionId,
-          {
-            status: 'submitted',
-            submittedAt: new Date(),
-            answers
-          },
-          { new: true }
-        );
-
-        io.to(`quiz-${quizId}`).emit('submission-complete', {
-          submissionId,
-          studentId: data.studentId,
-          message: 'Quiz submitted successfully'
+            if (role) {
+                socket.join(`role-${role}-${institutionKey}`);
+                if (role === 'admin') {
+                    socket.join('admins');
+                }
+            }
         });
 
-        await sendPersistentNotification({
-          title: 'Quiz Submitted',
-          message: `Student ${data.studentId} submitted quiz ${quizId}`,
-          type: 'quiz',
-          severity: 'info',
-          audience: {
-            roles: ['faculty', 'admin'],
-            institution: data.institutionId
-          },
-          context: {
-            quiz: quizId,
-            submission: submissionId,
-            student: data.studentId
-          }
+        // Join quiz room
+        socket.on('join-quiz', (data) => {
+            const { submissionId, quizId, studentId } = data;
+            socket.join(`quiz-${quizId}`);
+            if (submissionId) {
+                socket.join(`submission-${submissionId}`);
+            }
+
+            if (submissionId && studentId && !activeQuizzes.has(submissionId)) {
+                activeQuizzes.set(submissionId, {
+                    submissionId,
+                    quizId,
+                    studentId,
+                    socketId: socket.id,
+                    activities: [],
+                    joinedAt: new Date()
+                });
+            }
+
+            console.log(`Student ${studentId} joined quiz ${quizId}`);
         });
 
-        activeQuizzes.delete(submissionId);
-        socket.leave(`submission-${submissionId}`);
+        // Alias: joinQuiz for compatibility with clients using camelCase
+        socket.on('joinQuiz', (payload) => {
+            if (typeof payload === 'string' || typeof payload === 'number') {
+                const quizId = payload;
+                socket.join(`quiz-${quizId}`);
+                console.log(`Joined quiz room ${quizId}`);
+                return;
+            }
 
-        // Update dashboard stats and feed for admins
-        try {
-          const stats = await computeDashboardStats(data.institutionId);
-          io.to('admins').emit('dashboard-stats', { stats });
-          io.to('admins').emit('dashboard-activity', {
-            type: 'SUBMISSION_COMPLETE',
-            quizId,
-            submissionId,
-            studentId: data.studentId,
-            timestamp: new Date().toISOString()
-          });
-        } catch (_) {}
-      } catch (error) {
-        console.error('Error submitting quiz:', error);
-        socket.emit('error', { message: 'Failed to submit quiz' });
-      }
+            const { submissionId, quizId, studentId } = payload || {};
+            if (quizId) {
+                socket.join(`quiz-${quizId}`);
+            }
+            if (submissionId) {
+                socket.join(`submission-${submissionId}`);
+                if (!activeQuizzes.has(submissionId)) {
+                    activeQuizzes.set(submissionId, {
+                        submissionId,
+                        quizId,
+                        studentId,
+                        socketId: socket.id,
+                        activities: [],
+                        joinedAt: new Date()
+                    });
+                }
+            }
+            console.log(`Student ${studentId} joined quiz ${quizId}`);
+        });
+
+        // Join admin dashboard room to receive live stats & activity
+        socket.on('join-dashboard', async(data = {}) => {
+            const { institutionId } = data;
+            socket.join('admins');
+            try {
+                const stats = await computeDashboardStats(institutionId);
+                socket.emit('dashboard-stats', { stats });
+            } catch (err) {
+                console.error('Error computing dashboard stats:', err);
+            }
+        });
+
+        // Join student dashboard notification room
+        socket.on('join-student-dashboard', (data = {}) => {
+            const { studentId, institutionId } = data;
+
+            if (studentId) {
+                socket.join(`student-${studentId}`);
+            }
+
+            if (institutionId) {
+                socket.join(`institution-${institutionId}-students`);
+            }
+        });
+
+        // Log student activity
+        socket.on('activity', async(data) => {
+            const { submissionId, quizId, activityType, details } = data;
+            const studentName = data.studentName || 'Unknown Student';
+            const studentEmail = data.studentEmail || 'No email';
+            const normalizedActivityType = normalizeActivityType(activityType);
+
+            try {
+                // Save activity to database
+                const activity = await ActivityLog.create({
+                    submission: submissionId,
+                    student: data.studentId,
+                    quiz: quizId,
+                    institution: data.institutionId,
+                    activityType: normalizedActivityType,
+                    severity: ActivityAnalyzer.getSeverityFromScore(0), // Initial severity
+                    description: `User performed: ${normalizedActivityType}`,
+                    timestamp: new Date(),
+                    details,
+                    ipAddress: socket.handshake.address,
+                    userAgent: socket.handshake.headers['user-agent']
+                });
+
+                // Add to active quiz activities
+                const submission = activeQuizzes.get(submissionId);
+                if (submission) {
+                    submission.activities.push(activity);
+                }
+
+                // Emit activity to faculty monitoring this quiz
+                io.to(`quiz-${quizId}`).emit('activity-logged', {
+                    submissionId,
+                    studentId: data.studentId,
+                    studentName,
+                    studentEmail,
+                    activityType: normalizedActivityType,
+                    severity: activity.severity,
+                    timestamp: new Date()
+                });
+
+                // Broadcast lightweight activity feed for admins
+                io.to('admins').emit('dashboard-activity', {
+                    type: activityType,
+                    normalizedType: normalizedActivityType,
+                    severity: activity.severity,
+                    quizId,
+                    submissionId,
+                    studentId: data.studentId,
+                    studentName,
+                    studentEmail,
+                    timestamp: new Date().toISOString()
+                });
+
+                // Instant faculty alerts for key proctoring events
+                if (normalizedActivityType === ACTIVITY_TYPES.FULLSCREEN_EXIT) {
+                    const count = nextViolationCount(submissionId, normalizedActivityType);
+                    const suffix = count > 1 ? ` (${count})` : '';
+                    const baseMessage = `${studentName} (${studentEmail}) exited fullscreen during quiz attempt`;
+
+                    io.to(`quiz-${quizId}`).emit('alert', {
+                        submissionId,
+                        studentId: data.studentId,
+                        studentName,
+                        studentEmail,
+                        alertType: 'FULLSCREEN_EXIT',
+                        severity: ALERT_SEVERITY.CRITICAL,
+                        activity: normalizedActivityType,
+                        score: 100,
+                        count,
+                        message: `${baseMessage}${suffix}`
+                    });
+
+                    io.to(`quiz-${quizId}`).emit('fullscreenExitDetected', {
+                        submissionId,
+                        studentId: data.studentId,
+                        studentName,
+                        studentEmail,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    await upsertAlertNotification({
+                        title: 'Fullscreen Exit Detected',
+                        message: `${baseMessage}${suffix}`,
+                        severity: ALERT_SEVERITY.CRITICAL,
+                        audience: {
+                            roles: ['faculty', 'admin'],
+                            institution: data.institutionId
+                        },
+                        context: {
+                            quiz: quizId,
+                            submission: submissionId,
+                            student: data.studentId,
+                            metadata: { activity: normalizedActivityType }
+                        },
+                        activityKey: normalizedActivityType,
+                        count
+                    });
+                }
+
+                if (normalizedActivityType === ACTIVITY_TYPES.TAB_CHANGE) {
+                    const count = nextViolationCount(submissionId, normalizedActivityType);
+                    const suffix = count > 1 ? ` (${count})` : '';
+                    const baseMessage = `${studentName} (${studentEmail}) switched tab/window during quiz attempt`;
+
+                    io.to(`quiz-${quizId}`).emit('alert', {
+                        submissionId,
+                        studentId: data.studentId,
+                        studentName,
+                        studentEmail,
+                        alertType: 'TAB_SWITCH',
+                        severity: ALERT_SEVERITY.HIGH,
+                        activity: normalizedActivityType,
+                        score: 80,
+                        count,
+                        message: `${baseMessage}${suffix}`
+                    });
+
+                    io.to(`quiz-${quizId}`).emit('tabSwitchDetected', {
+                        submissionId,
+                        studentId: data.studentId,
+                        studentName,
+                        studentEmail,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    await upsertAlertNotification({
+                        title: 'Tab Switch Detected',
+                        message: `${baseMessage}${suffix}`,
+                        severity: ALERT_SEVERITY.HIGH,
+                        audience: {
+                            roles: ['faculty', 'admin'],
+                            institution: data.institutionId
+                        },
+                        context: {
+                            quiz: quizId,
+                            submission: submissionId,
+                            student: data.studentId,
+                            metadata: { activity: normalizedActivityType }
+                        },
+                        activityKey: normalizedActivityType,
+                        count
+                    });
+                }
+
+                if (normalizedActivityType === ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE) {
+                    const count = nextViolationCount(submissionId, normalizedActivityType);
+                    const suffix = count > 1 ? ` (${count})` : '';
+                    const baseMessage = `${studentName} (${studentEmail}) attempted refresh/close or lost visibility`;
+
+                    io.to(`quiz-${quizId}`).emit('alert', {
+                        submissionId,
+                        studentId: data.studentId,
+                        studentName,
+                        studentEmail,
+                        alertType: 'PAGE_REFRESH_OR_CLOSE_ATTEMPT',
+                        severity: ALERT_SEVERITY.HIGH,
+                        activity: normalizedActivityType,
+                        score: 75,
+                        count,
+                        message: `${baseMessage}${suffix}`
+                    });
+
+                    await upsertAlertNotification({
+                        title: 'Page Visibility Lost',
+                        message: `${baseMessage}${suffix}`,
+                        severity: ALERT_SEVERITY.HIGH,
+                        audience: {
+                            roles: ['faculty', 'admin'],
+                            institution: data.institutionId
+                        },
+                        context: {
+                            quiz: quizId,
+                            submission: submissionId,
+                            student: data.studentId,
+                            metadata: { activity: normalizedActivityType }
+                        },
+                        activityKey: normalizedActivityType,
+                        count
+                    });
+                }
+
+                // Check for suspicious activity score
+                if ([ACTIVITY_TYPES.TAB_CHANGE, ACTIVITY_TYPES.FULLSCREEN_EXIT, ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE].includes(normalizedActivityType)) {
+                    const activities = submission?.activities || [];
+                    const suspicionScore = ActivityAnalyzer.calculateSuspicionScore(activities, 60);
+
+                    if (suspicionScore > 40) {
+                        io.to(`quiz-${quizId}`).emit('alert', {
+                            submissionId,
+                            studentId: data.studentId,
+                            studentName,
+                            studentEmail,
+                            alertType: 'SUSPICIOUS_ACTIVITY',
+                            severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
+                            score: suspicionScore,
+                            activity: normalizedActivityType,
+                            message: `${studentName} (${studentEmail}) triggered suspicious activity`
+                        });
+
+                        await sendPersistentNotification({
+                            title: 'Suspicious Activity Detected',
+                            message: `${studentName} (${studentEmail}) triggered suspicious activity`,
+                            type: 'alert',
+                            severity: ActivityAnalyzer.getSeverityFromScore(suspicionScore),
+                            audience: {
+                                roles: ['faculty', 'admin'],
+                                institution: data.institutionId
+                            },
+                            context: {
+                                quiz: quizId,
+                                submission: submissionId,
+                                student: data.studentId,
+                                metadata: { activity: normalizedActivityType, suspicionScore }
+                            }
+                        });
+                    }
+                }
+
+                // Optionally refresh stats for admins (cheap enough for now)
+                try {
+                    const stats = await computeDashboardStats(data.institutionId);
+                    io.to('admins').emit('dashboard-stats', { stats });
+                } catch (e) {
+                    // ignore stats refresh errors
+                }
+            } catch (error) {
+                console.error('Error logging activity:', error);
+            }
+        });
+
+        // Monitor page visibility changes
+        socket.on('visibility-change', async(data) => {
+            const { submissionId, isVisible } = data;
+
+            try {
+                const activity = await ActivityLog.create({
+                    submission: submissionId,
+                    student: data.studentId,
+                    quiz: data.quizId,
+                    institution: data.institutionId,
+                    activityType: ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE,
+                    severity: !isVisible ? ALERT_SEVERITY.HIGH : ALERT_SEVERITY.LOW,
+                    description: !isVisible ? 'Page hidden - potential cheating' : 'Page visible again',
+                    timestamp: new Date(),
+                    details: { isVisible }
+                });
+
+                if (!isVisible) {
+                    io.to(`quiz-${data.quizId}`).emit('alert', {
+                        submissionId,
+                        studentId: data.studentId,
+                        alertType: 'PAGE_HIDDEN',
+                        severity: ALERT_SEVERITY.HIGH
+                    });
+
+                    await sendPersistentNotification({
+                        title: 'Page Hidden',
+                        message: `${data.studentId || 'Student'} hid or left the quiz page`,
+                        type: 'alert',
+                        severity: ALERT_SEVERITY.HIGH,
+                        audience: {
+                            roles: ['faculty', 'admin'],
+                            institution: data.institutionId
+                        },
+                        context: {
+                            quiz: data.quizId,
+                            submission: submissionId,
+                            student: data.studentId,
+                            metadata: { activity: ACTIVITY_TYPES.PAGE_VISIBILITY_CHANGE }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error in visibility change:', error);
+            }
+        });
+
+        // Submit Quiz
+        socket.on('submit-quiz', async(data) => {
+            const { submissionId, quizId, answers } = data;
+
+            try {
+                const submission = await StudentSubmission.findById(submissionId);
+
+                if (!submission) {
+                    socket.emit('error', { message: 'Submission not found' });
+                    return;
+                }
+
+                // Idempotent socket submit: if already submitted/graded, just echo current result.
+                if (submission.status !== 'in_progress') {
+                    io.to(`quiz-${quizId}`).emit('submission-complete', {
+                        submissionId,
+                        studentId: data.studentId,
+                        message: 'Quiz already submitted',
+                        score: submission.score ?? submission.totalMarksObtained ?? 0,
+                        totalMarks: submission.totalMarks ?? 0,
+                        percentage: submission.percentage ?? 0,
+                        grade: submission.grade ?? null
+                    });
+                    return;
+                }
+
+                const quiz = await Quiz.findById(quizId);
+                const questions = await Question.find({ quiz: quizId }).sort({ order: 1 });
+
+                const savedAnswers = Array.isArray(submission.answers) ? submission.answers : [];
+                const submittedAnswers = Array.isArray(answers) ? answers : [];
+
+                const mergedAnswerMap = new Map(
+                    savedAnswers.map((answer) => [String(answer.questionId || answer.question || answer._id), answer])
+                );
+                submittedAnswers.forEach((answer) => {
+                    const key = String(answer?.questionId || answer?.question || answer?._id || '');
+                    if (!key) return;
+                    const existing = mergedAnswerMap.get(key) || {};
+                    mergedAnswerMap.set(key, {
+                        ...existing,
+                        ...answer,
+                        questionId: answer?.questionId || existing?.questionId || key
+                    });
+                });
+
+                const graded = gradeQuizAttempt({
+                    questions,
+                    answers: Array.from(mergedAnswerMap.values()),
+                    passingMarks: quiz?.passingMarks || 0,
+                    quiz
+                });
+
+                submission.status = graded.status === 'graded' ? 'graded' : 'submitted';
+                submission.submittedAt = new Date();
+                submission.answers = graded.answers;
+                submission.score = graded.obtainedMarks;
+                submission.totalMarksObtained = graded.obtainedMarks;
+                submission.totalMarks = graded.totalMarks;
+                submission.percentage = graded.percentage;
+                submission.isPassed = graded.isPassed;
+                submission.grade = graded.grade;
+                await submission.save();
+
+                io.to(`quiz-${quizId}`).emit('submission-complete', {
+                    submissionId,
+                    studentId: data.studentId,
+                    message: 'Quiz submitted successfully',
+                    score: graded.obtainedMarks,
+                    totalMarks: graded.totalMarks,
+                    percentage: graded.percentage,
+                    grade: graded.grade
+                });
+
+                await sendPersistentNotification({
+                    title: 'Quiz Submitted',
+                    message: `Student ${data.studentId} submitted quiz ${quizId}`,
+                    type: 'quiz',
+                    severity: 'info',
+                    audience: {
+                        roles: ['faculty', 'admin'],
+                        institution: data.institutionId
+                    },
+                    context: {
+                        quiz: quizId,
+                        submission: submissionId,
+                        student: data.studentId
+                    }
+                });
+
+                activeQuizzes.delete(submissionId);
+                socket.leave(`submission-${submissionId}`);
+
+                // Update dashboard stats and feed for admins
+                try {
+                    const stats = await computeDashboardStats(data.institutionId);
+                    io.to('admins').emit('dashboard-stats', { stats });
+                    io.to('admins').emit('dashboard-activity', {
+                        type: 'SUBMISSION_COMPLETE',
+                        quizId,
+                        submissionId,
+                        studentId: data.studentId,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (_) {}
+            } catch (error) {
+                console.error('Error submitting quiz:', error);
+                socket.emit('error', { message: 'Failed to submit quiz' });
+            }
+        });
+
+        // Disconnect
+        socket.on('disconnect', () => {
+            activeQuizzes.forEach((value, key) => {
+                if (value.socketId === socket.id) {
+                    activeQuizzes.delete(key);
+                }
+            });
+            console.log('User disconnected:', socket.id);
+        });
     });
 
-    // Disconnect
-    socket.on('disconnect', () => {
-      activeQuizzes.forEach((value, key) => {
-        if (value.socketId === socket.id) {
-          activeQuizzes.delete(key);
-        }
-      });
-      console.log('User disconnected:', socket.id);
-    });
-  });
-
-  return io;
+    return io;
 };
 
 export const initSocket = initializeSocketIO;

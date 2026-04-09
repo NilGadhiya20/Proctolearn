@@ -6,7 +6,9 @@ import {
   getAllSubscribers,
   getSubscriberStats,
   sendNewsletterToSubscribers,
-  checkSubscriptionStatus
+  checkSubscriptionStatus,
+  sendFacultyNotificationEmail,
+  triggerWeeklyNewsletter
 } from '../controllers/subscriptionController.js';
 import { auth, checkRole } from '../middleware/auth.js';
 import { USER_ROLES } from '../config/constants.js';
@@ -23,5 +25,9 @@ router.patch('/preferences', updateSubscriptionPreferences);
 router.get('/all', auth, checkRole(USER_ROLES.ADMIN), getAllSubscribers);
 router.get('/stats', auth, checkRole(USER_ROLES.ADMIN), getSubscriberStats);
 router.post('/send-newsletter', auth, checkRole(USER_ROLES.ADMIN), sendNewsletterToSubscribers);
+
+// Faculty email automation routes (Admin only)
+router.post('/send-faculty-notification', auth, checkRole(USER_ROLES.ADMIN), sendFacultyNotificationEmail);
+router.post('/weekly-newsletter', auth, checkRole(USER_ROLES.ADMIN), triggerWeeklyNewsletter);
 
 export default router;

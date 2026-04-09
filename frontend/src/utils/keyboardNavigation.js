@@ -97,24 +97,24 @@ export const handleListKeyboard = (event, currentIndex, itemCount, onNavigate) =
   let newIndex = currentIndex;
   
   switch (event.key) {
-    case KEYS.ARROW_DOWN:
-      event.preventDefault();
-      newIndex = Math.min(currentIndex + 1, itemCount - 1);
-      break;
-    case KEYS.ARROW_UP:
-      event.preventDefault();
-      newIndex = Math.max(currentIndex - 1, 0);
-      break;
-    case KEYS.HOME:
-      event.preventDefault();
-      newIndex = 0;
-      break;
-    case KEYS.END:
-      event.preventDefault();
-      newIndex = itemCount - 1;
-      break;
-    default:
-      return;
+  case KEYS.ARROW_DOWN:
+    event.preventDefault();
+    newIndex = Math.min(currentIndex + 1, itemCount - 1);
+    break;
+  case KEYS.ARROW_UP:
+    event.preventDefault();
+    newIndex = Math.max(currentIndex - 1, 0);
+    break;
+  case KEYS.HOME:
+    event.preventDefault();
+    newIndex = 0;
+    break;
+  case KEYS.END:
+    event.preventDefault();
+    newIndex = itemCount - 1;
+    break;
+  default:
+    return;
   }
   
   if (newIndex !== currentIndex) {
@@ -129,24 +129,24 @@ export const handleTabKeyboard = (event, currentIndex, tabCount, onNavigate) => 
   let newIndex = currentIndex;
   
   switch (event.key) {
-    case KEYS.ARROW_LEFT:
-      event.preventDefault();
-      newIndex = currentIndex > 0 ? currentIndex - 1 : tabCount - 1;
-      break;
-    case KEYS.ARROW_RIGHT:
-      event.preventDefault();
-      newIndex = currentIndex < tabCount - 1 ? currentIndex + 1 : 0;
-      break;
-    case KEYS.HOME:
-      event.preventDefault();
-      newIndex = 0;
-      break;
-    case KEYS.END:
-      event.preventDefault();
-      newIndex = tabCount - 1;
-      break;
-    default:
-      return;
+  case KEYS.ARROW_LEFT:
+    event.preventDefault();
+    newIndex = currentIndex > 0 ? currentIndex - 1 : tabCount - 1;
+    break;
+  case KEYS.ARROW_RIGHT:
+    event.preventDefault();
+    newIndex = currentIndex < tabCount - 1 ? currentIndex + 1 : 0;
+    break;
+  case KEYS.HOME:
+    event.preventDefault();
+    newIndex = 0;
+    break;
+  case KEYS.END:
+    event.preventDefault();
+    newIndex = tabCount - 1;
+    break;
+  default:
+    return;
   }
   
   if (newIndex !== currentIndex) {

@@ -14,6 +14,8 @@ import {
   getStudentSubmission,
   getStudentSubmissions,
   getQuizSubmissions,
+  getSubmissionDetails,
+  updateSubmissionGrade,
   getSubmissionActivityLogs,
   startExamSession,
   logSecurityEvent,
@@ -146,6 +148,20 @@ router.get('/:id/submissions',
   checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
   verifyInstitutionAccess,
   getQuizSubmissions
+);
+
+router.get('/submission/:submissionId/details',
+  auth,
+  checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
+  verifyInstitutionAccess,
+  getSubmissionDetails
+);
+
+router.patch('/submission/:submissionId/grade',
+  auth,
+  checkRole(USER_ROLES.FACULTY, USER_ROLES.ADMIN),
+  verifyInstitutionAccess,
+  updateSubmissionGrade
 );
 
 // Get activity logs for a submission

@@ -29,13 +29,14 @@ export const saveAnswer = async (quizId, questionId, answer, flagged = false) =>
   return res.data?.data;
 };
 
-export const submitQuiz = async (quizId) => {
+export const submitQuiz = async (quizId, answers = null) => {
   // Defensive validation
   if (!quizId || quizId === 'undefined') {
     throw new Error('Invalid quiz ID provided');
   }
   
-  const res = await apiClient.post(`/quizzes/${quizId}/submit`);
+  const payload = Array.isArray(answers) ? { answers } : {};
+  const res = await apiClient.post(`/quizzes/${quizId}/submit`, payload);
   return res.data?.data;
 };
 

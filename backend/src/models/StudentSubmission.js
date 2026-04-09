@@ -47,6 +47,7 @@ const submissionSchema = new mongoose.Schema(
     submittedAt: Date,
     totalTimeSpent: Number,
     answers: [answerSchema],
+    score: { type: Number, default: 0 },
     totalMarksObtained: { type: Number, default: 0 },
     totalMarks: { type: Number, default: 0 },
     percentage: { type: Number, default: 0 },

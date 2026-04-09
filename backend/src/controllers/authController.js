@@ -9,683 +9,730 @@ import { OAuth2Client } from 'google-auth-library';
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
+import { getIOInstance } from '../utils/socketRegistry.js';
+import Quiz from '../models/Quiz.js';
 
-const googleClient = process.env.GOOGLE_CLIENT_ID
-  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
-  : null;
+// Helper to compute stats (copied logic or centralized)
+const computeDashboardStats = async(institutionId) => {
+    const userFilter = institutionId ? { institution: institutionId } : {};
+    const quizFilter = institutionId ? { institution: institutionId } : {};
+
+    const [facultyCount, studentCount, totalQuizzes, activeQuizzes] = await Promise.all([
+        User.countDocuments({...userFilter, role: 'faculty' }),
+        User.countDocuments({...userFilter, role: 'student' }),
+        Quiz.countDocuments({...quizFilter }),
+        Quiz.countDocuments({...quizFilter, status: { $in: ['active', 'published'] } })
+    ]);
+
+    return {
+        faculty: facultyCount,
+        students: studentCount,
+        totalQuizzes,
+        activeQuizzes
+    };
+};
+
+const googleClient = process.env.GOOGLE_CLIENT_ID ?
+    new OAuth2Client(process.env.GOOGLE_CLIENT_ID) :
+    null;
 
 // Register User
-export const registerUser = asyncHandler(async (req, res) => {
-  const { firstName, lastName, email, password, role = USER_ROLES.STUDENT, institutionCode, department, adminCode } = req.body;
+export const registerUser = asyncHandler(async(req, res) => {
+    const { firstName, lastName, email, password, role = USER_ROLES.STUDENT, institutionCode, department, adminCode } = req.body;
 
-  // Check if user exists
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(HTTP_STATUS.CONFLICT).json({
-      success: false,
-      message: 'Email already registered'
-    });
-  }
-
-  // Validate admin code if registering as admin
-  if (role === USER_ROLES.ADMIN) {
-    if (!adminCode || adminCode !== 'NIL-PROCTO2912') {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        success: false,
-        message: 'Invalid or missing admin code. Cannot create admin account.'
-      });
-    }
-  }
-
-  // Find institution by code
-  const institution = await Institution.findOne({ code: institutionCode });
-  if (!institution) {
-    return res.status(HTTP_STATUS.NOT_FOUND).json({
-      success: false,
-      message: 'Institution not found'
-    });
-  }
-
-  // Create new user
-  const user = await User.create({
-    firstName,
-    lastName,
-    email,
-    password,
-    role,
-    institution: institution._id,
-    department,
-    adminCode: role === USER_ROLES.ADMIN ? adminCode : undefined
-  });
-
-  // Generate email verification token
-  const emailVerificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
-
-  // Send verification email and welcome email
-  if (process.env.NODE_ENV !== 'test') {
-    // Send verification email
-    await sendVerificationEmail(email, emailVerificationToken, firstName);
-    
-    // Send welcome email with user details
-    await sendWelcomeEmail(
-      email, 
-      firstName, 
-      role, 
-      institution.name
-    );
-  }
-
-  // Generate tokens
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  res.status(HTTP_STATUS.CREATED).json({
-    success: true,
-    message: 'User registered successfully. Please verify your email.',
-    data: {
-      user: user.toJSON(),
-      token,
-      refreshToken
-    }
-  });
-});
-
-// Login User
-export const loginUser = asyncHandler(async (req, res) => {
-  const { email, password, adminCode, role } = req.body;
-
-  // Validate input
-  if (!email || !password) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Email and password are required'
-    });
-  }
-
-  // Find user
-  const user = await User.findOne({ email }).select('+password');
-  if (!user) {
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: 'Invalid email or password'
-    });
-  }
-
-  // Check password
-  const isPasswordValid = await user.matchPassword(password);
-  if (!isPasswordValid) {
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: 'Invalid email or password'
-    });
-  }
-
-  // Check if user's role matches the login section
-  if (role && user.role !== role) {
-    return res.status(HTTP_STATUS.FORBIDDEN).json({
-      success: false,
-      message: `You must be a ${role} to login through the ${role} section.`,
-      expectedRole: role,
-      userRole: user.role
-    });
-  }
-
-  // Check admin code if user is admin
-  if (user.role === USER_ROLES.ADMIN) {
-    if (!adminCode) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'Admin code is required for admin login'
-      });
-    }
-
-    if (user.adminCode !== adminCode) {
-      return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-        success: false,
-        message: 'Invalid admin code'
-      });
-    }
-  }
-
-  // Check if user is active
-  if (!user.isActive) {
-    return res.status(HTTP_STATUS.FORBIDDEN).json({
-      success: false,
-      message: 'Your account has been deactivated'
-    });
-  }
-
-  // Generate tokens immediately for faster response
-  const token = generateToken(user._id);
-  const refreshToken = generateRefreshToken(user._id);
-
-  // Update last login asynchronously (non-blocking)
-  // This improves response time significantly
-  User.updateOne(
-    { _id: user._id },
-    { $set: { lastLogin: new Date() } }
-  ).exec().catch(err => console.error('Failed to update lastLogin:', err));
-
-  // Send response immediately without waiting for lastLogin update
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Login successful',
-    data: {
-      user: user.toJSON(),
-      token,
-      refreshToken
-    }
-  });
-});
-
-// Google OAuth Login
-export const googleAuthLogin = asyncHandler(async (req, res) => {
-  const { idToken, accessToken, institutionCode } = req.body;
-
-  if (!idToken && !accessToken) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'idToken or accessToken is required for Google login'
-    });
-  }
-
-  if (idToken && (!process.env.GOOGLE_CLIENT_ID || !googleClient)) {
-    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-      success: false,
-      message: 'Google OAuth is not configured. Please set GOOGLE_CLIENT_ID.'
-    });
-  }
-
-  try {
-    let email, firstName, lastName, profilePicture;
-
-    // Prefer ID token verification when provided
-    if (idToken) {
-      const ticket = await googleClient.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID
-      });
-
-      const payload = ticket.getPayload();
-      email = payload?.email;
-      firstName = payload?.given_name || payload?.name?.split(' ')[0] || 'Google';
-      lastName = payload?.family_name || payload?.name?.split(' ').slice(1).join(' ') || 'User';
-      profilePicture = payload?.picture;
-    } else if (accessToken) {
-      // Fallback: validate via Google Userinfo endpoint using OAuth access token (e.g., Supabase provider token)
-      const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-
-      const profile = userInfoResponse.data;
-      email = profile?.email;
-      firstName = profile?.given_name || profile?.name?.split(' ')[0] || 'Google';
-      lastName = profile?.family_name || profile?.name?.split(' ').slice(1).join(' ') || 'User';
-      profilePicture = profile?.picture;
-    }
-
-    if (!email) {
-      return res.status(HTTP_STATUS.BAD_REQUEST).json({
-        success: false,
-        message: 'Email not available from Google profile'
-      });
-    }
-
-    let user = await User.findOne({ email });
-
-    // If user does not exist, create with default institution and random password
-    if (!user) {
-      const resolvedInstitutionCode = (institutionCode || process.env.DEFAULT_INSTITUTION_CODE || '').toUpperCase();
-
-      if (!resolvedInstitutionCode) {
-        return res.status(HTTP_STATUS.BAD_REQUEST).json({
-          success: false,
-          message: 'Institution code is required for new Google sign-ins'
+    // Check if user exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+            success: false,
+            message: 'Email already registered'
         });
-      }
+    }
 
-      const institution = await Institution.findOne({ code: resolvedInstitutionCode });
-      if (!institution) {
+    // Validate admin code if registering as admin
+    if (role === USER_ROLES.ADMIN) {
+        if (!adminCode || adminCode !== 'NIL-PROCTO2912') {
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+                success: false,
+                message: 'Invalid or missing admin code. Cannot create admin account.'
+            });
+        }
+    }
+
+    // Find institution by code
+    const institution = await Institution.findOne({ code: institutionCode });
+    if (!institution) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
-          success: false,
-          message: `Institution with code ${resolvedInstitutionCode} not found`
+            success: false,
+            message: 'Institution not found'
         });
-      }
+    }
 
-      const randomPassword = uuidv4();
-
-      user = await User.create({
+    // Create new user
+    const user = await User.create({
         firstName,
         lastName,
         email,
-        password: randomPassword,
-        role: USER_ROLES.STUDENT,
+        password,
+        role,
         institution: institution._id,
-        isEmailVerified: true,
-        profilePicture,
-        lastLogin: new Date()
-      });
+        department,
+        adminCode: role === USER_ROLES.ADMIN ? adminCode : undefined
+    });
+
+    // Generate email verification token
+    const emailVerificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    // Send verification email and welcome email
+    if (process.env.NODE_ENV !== 'test') {
+        // Send verification email
+        await sendVerificationEmail(email, emailVerificationToken, firstName);
+
+        // Send welcome email with user details
+        await sendWelcomeEmail(
+            email,
+            firstName,
+            role,
+            institution.name
+        );
     }
 
+    // Generate tokens
+    const token = generateToken(user._id);
+    const refreshToken = generateRefreshToken(user._id);
+
+    // Emit real-time update to admins
+    const io = getIOInstance();
+    if (io) {
+        try {
+            const stats = await computeDashboardStats(institution?._id);
+            io.to('admins').emit('dashboard-stats', { stats });
+            io.to('admins').emit('dashboard-activity', {
+                type: 'USER_REGISTER',
+                user: { firstName, lastName, role, email },
+                timestamp: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Failed to emit dashboard update:', err);
+        }
+    }
+
+    res.status(HTTP_STATUS.CREATED).json({
+        success: true,
+        message: 'User registered successfully. Please verify your email.',
+        data: {
+            user: user.toJSON(),
+            token,
+            refreshToken
+        }
+    });
+});
+
+// Login User
+export const loginUser = asyncHandler(async(req, res) => {
+    const { email, password, adminCode, role } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Email and password are required'
+        });
+    }
+
+    // Find user
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: 'Invalid email or password'
+        });
+    }
+
+    // Check password
+    const isPasswordValid = await user.matchPassword(password);
+    if (!isPasswordValid) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: 'Invalid email or password'
+        });
+    }
+
+    // Check if user's role matches the login section
+    if (role && user.role !== role) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+            success: false,
+            message: `You must be a ${role} to login through the ${role} section.`,
+            expectedRole: role,
+            userRole: user.role
+        });
+    }
+
+    // Check admin code if user is admin
+    if (user.role === USER_ROLES.ADMIN) {
+        if (!adminCode) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                success: false,
+                message: 'Admin code is required for admin login'
+            });
+        }
+
+        if (user.adminCode !== adminCode) {
+            return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+                success: false,
+                message: 'Invalid admin code'
+            });
+        }
+    }
+
+    // Check if user is active
     if (!user.isActive) {
-      return res.status(HTTP_STATUS.FORBIDDEN).json({
-        success: false,
-        message: 'Your account has been deactivated'
-      });
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+            success: false,
+            message: 'Your account has been deactivated'
+        });
     }
 
-    // Generate tokens immediately
+    // Generate tokens immediately for faster response
     const token = generateToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
 
     // Update last login asynchronously (non-blocking)
-    User.updateOne(
-      { _id: user._id },
-      { $set: { lastLogin: new Date() } }
-    ).exec().catch(err => console.error('Failed to update lastLogin:', err));
+    // This improves response time significantly
+    User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).exec().catch(err => console.error('Failed to update lastLogin:', err));
 
-    return res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: 'Google login successful',
-      data: {
-        user: user.toJSON(),
-        token,
-        refreshToken
-      }
+    // Send response immediately without waiting for lastLogin update
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Login successful',
+        data: {
+            user: user.toJSON(),
+            token,
+            refreshToken
+        }
     });
-  } catch (error) {
-    console.error('Google login error:', error.message);
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: 'Google authentication failed'
-    });
-  }
+});
+
+// Google OAuth Login
+export const googleAuthLogin = asyncHandler(async(req, res) => {
+    const { idToken, accessToken, institutionCode } = req.body;
+
+    if (!idToken && !accessToken) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'idToken or accessToken is required for Google login'
+        });
+    }
+
+    if (idToken && (!process.env.GOOGLE_CLIENT_ID || !googleClient)) {
+        return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+            success: false,
+            message: 'Google OAuth is not configured. Please set GOOGLE_CLIENT_ID.'
+        });
+    }
+
+    try {
+        let email, firstName, lastName, profilePicture;
+
+        // Prefer ID token verification when provided
+        if (idToken) {
+            const ticket = await googleClient.verifyIdToken({
+                idToken,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+
+            const payload = ticket.getPayload();
+            email = payload?.email;
+            firstName = payload?.given_name || payload?.name?.split(' ')[0] || 'Google';
+            lastName = payload?.family_name || payload?.name?.split(' ').slice(1).join(' ') || 'User';
+            profilePicture = payload?.picture;
+        } else if (accessToken) {
+            // Fallback: validate via Google Userinfo endpoint using OAuth access token (e.g., Supabase provider token)
+            const userInfoResponse = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
+
+            const profile = userInfoResponse.data;
+            email = profile?.email;
+            firstName = profile?.given_name || profile?.name?.split(' ')[0] || 'Google';
+            lastName = profile?.family_name || profile?.name?.split(' ').slice(1).join(' ') || 'User';
+            profilePicture = profile?.picture;
+        }
+
+        if (!email) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                success: false,
+                message: 'Email not available from Google profile'
+            });
+        }
+
+        let user = await User.findOne({ email });
+
+        // If user does not exist, create with default institution and random password
+        if (!user) {
+            const resolvedInstitutionCode = (institutionCode || process.env.DEFAULT_INSTITUTION_CODE || '').toUpperCase();
+
+            if (!resolvedInstitutionCode) {
+                return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                    success: false,
+                    message: 'Institution code is required for new Google sign-ins'
+                });
+            }
+
+            const institution = await Institution.findOne({ code: resolvedInstitutionCode });
+            if (!institution) {
+                return res.status(HTTP_STATUS.NOT_FOUND).json({
+                    success: false,
+                    message: `Institution with code ${resolvedInstitutionCode} not found`
+                });
+            }
+
+            const randomPassword = uuidv4();
+
+            user = await User.create({
+                firstName,
+                lastName,
+                email,
+                password: randomPassword,
+                role: USER_ROLES.STUDENT,
+                institution: institution._id,
+                isEmailVerified: true,
+                profilePicture,
+                lastLogin: new Date()
+            });
+        }
+
+        if (!user.isActive) {
+            return res.status(HTTP_STATUS.FORBIDDEN).json({
+                success: false,
+                message: 'Your account has been deactivated'
+            });
+        }
+
+        // Generate tokens immediately
+        const token = generateToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
+
+        // Update last login asynchronously (non-blocking)
+        User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } }).exec().catch(err => console.error('Failed to update lastLogin:', err));
+
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: 'Google login successful',
+            data: {
+                user: user.toJSON(),
+                token,
+                refreshToken
+            }
+        });
+    } catch (error) {
+        console.error('Google login error:', error.message);
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: 'Google authentication failed'
+        });
+    }
 });
 
 // Refresh Token
-export const refreshAccessToken = asyncHandler(async (req, res) => {
-  const { refreshToken } = req.body;
+export const refreshAccessToken = asyncHandler(async(req, res) => {
+    const { refreshToken } = req.body;
 
-  if (!refreshToken) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Refresh token is required'
-    });
-  }
+    if (!refreshToken) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Refresh token is required'
+        });
+    }
 
-  try {
-    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    const newToken = generateToken(decoded.userId);
+    try {
+        const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+        const newToken = generateToken(decoded.userId);
 
-    res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: 'Token refreshed',
-      data: {
-        token: newToken
-      }
-    });
-  } catch (error) {
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: 'Invalid refresh token'
-    });
-  }
+        res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: 'Token refreshed',
+            data: {
+                token: newToken
+            }
+        });
+    } catch (error) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: 'Invalid refresh token'
+        });
+    }
 });
 
 // Get Current User
-export const getCurrentUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.userId).populate('institution');
+export const getCurrentUser = asyncHandler(async(req, res) => {
+    const user = await User.findById(req.userId).populate('institution');
 
-  if (!user) {
-    return res.status(HTTP_STATUS.NOT_FOUND).json({
-      success: false,
-      message: 'User not found'
+    if (!user) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+            success: false,
+            message: 'User not found'
+        });
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        data: user.toJSON()
     });
-  }
-
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: user.toJSON()
-  });
 });
 
 // Verify Email Exists (for forgot password)
-export const verifyEmailExists = asyncHandler(async (req, res) => {
-  const { email, role } = req.body;
+export const verifyEmailExists = asyncHandler(async(req, res) => {
+    const { email, role } = req.body;
 
-  if (!email || !role) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Email and role are required'
+    if (!email || !role) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Email and role are required'
+        });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+
+    if (!user) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+            success: false,
+            message: 'No account found with this email'
+        });
+    }
+
+    // Verify user role matches
+    if (user.role.toLowerCase() !== role.toLowerCase()) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: `This email is not registered as a ${role}`
+        });
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Email verified. Password reset link will be sent.',
+        data: { exists: true, email: user.email }
     });
-  }
-
-  // Find user by email
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    return res.status(HTTP_STATUS.NOT_FOUND).json({
-      success: false,
-      message: 'No account found with this email'
-    });
-  }
-
-  // Verify user role matches
-  if (user.role.toLowerCase() !== role.toLowerCase()) {
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: `This email is not registered as a ${role}`
-    });
-  }
-
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Email verified. Password reset link will be sent.',
-    data: { exists: true, email: user.email }
-  });
 });
 
 // Logout User (Optional - mainly for frontend)
-export const logoutUser = asyncHandler(async (req, res) => {
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Logged out successfully'
-  });
+export const logoutUser = asyncHandler(async(req, res) => {
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Logged out successfully'
+    });
 });
 
 // Test Email Configuration (Admin only - for debugging)
-export const testEmailConfiguration = asyncHandler(async (req, res) => {
-  const { testEmail } = req.body;
+export const testEmailConfiguration = asyncHandler(async(req, res) => {
+    const { testEmail } = req.body;
 
-  if (!testEmail) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Test email address is required'
-    });
-  }
-
-  try {
-    // Import email service dynamically
-    const { sendPasswordResetEmail } = await import('../utils/emailService.js');
-
-    const result = await sendPasswordResetEmail(
-      testEmail,
-      'test-token-12345',
-      'Test User'
-    );
-
-    if (result.success) {
-      return res.status(HTTP_STATUS.OK).json({
-        success: true,
-        message: 'Test email sent successfully',
-        details: 'Email configuration is working properly'
-      });
-    } else {
-      return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-        success: false,
-        message: 'Test email failed',
-        details: result.error || 'Unknown error'
-      });
+    if (!testEmail) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Test email address is required'
+        });
     }
-  } catch (error) {
-    console.error('Test email error:', error);
-    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-      success: false,
-      message: 'Test email configuration failed',
-      details: error.message
-    });
-  }
+
+    try {
+        // Import email service dynamically
+        const { sendPasswordResetEmail } = await
+        import ('../utils/emailService.js');
+
+        const result = await sendPasswordResetEmail(
+            testEmail,
+            'test-token-12345',
+            'Test User'
+        );
+
+        if (result.success) {
+            return res.status(HTTP_STATUS.OK).json({
+                success: true,
+                message: 'Test email sent successfully',
+                details: 'Email configuration is working properly'
+            });
+        } else {
+            return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+                success: false,
+                message: 'Test email failed',
+                details: result.error || 'Unknown error'
+            });
+        }
+    } catch (error) {
+        console.error('Test email error:', error);
+        return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+            success: false,
+            message: 'Test email configuration failed',
+            details: error.message
+        });
+    }
 });
 
 // Request Faculty Role
-export const requestFacultyRole = asyncHandler(async (req, res) => {
-  const { reason, qualifications } = req.body;
-  const uploadedPdf = req.file;
+export const requestFacultyRole = asyncHandler(async(req, res) => {
+    const { reason, qualifications } = req.body;
+    const uploadedPdf = req.file;
 
-  if (!reason || !qualifications) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Reason and qualifications are required'
+    if (!reason || !qualifications) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Reason and qualifications are required'
+        });
+    }
+
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+            success: false,
+            message: 'User not found'
+        });
+    }
+
+    // Check if user is already faculty or admin
+    if (user.role === USER_ROLES.FACULTY || user.role === USER_ROLES.ADMIN) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'You already have faculty or admin privileges'
+        });
+    }
+
+    // Check if there's already a pending request
+    if (user.facultyRequest && user.facultyRequest.status === 'pending') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'You already have a pending faculty request'
+        });
+    }
+
+    // Create faculty request
+    user.facultyRequest = {
+        status: 'pending',
+        requestedAt: new Date(),
+        reason,
+        qualifications,
+        document: uploadedPdf ? {
+            originalName: uploadedPdf.originalname,
+            fileName: uploadedPdf.filename,
+            mimeType: uploadedPdf.mimetype,
+            size: uploadedPdf.size,
+            path: `/uploads/faculty-requests/${uploadedPdf.filename}`,
+            uploadedAt: new Date()
+        } : undefined
+    };
+
+    await user.save();
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Faculty role request submitted successfully',
+        data: user.facultyRequest
     });
-  }
-
-  const user = await User.findById(req.userId);
-  
-  if (!user) {
-    return res.status(HTTP_STATUS.NOT_FOUND).json({
-      success: false,
-      message: 'User not found'
-    });
-  }
-
-  // Check if user is already faculty or admin
-  if (user.role === USER_ROLES.FACULTY || user.role === USER_ROLES.ADMIN) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'You already have faculty or admin privileges'
-    });
-  }
-
-  // Check if there's already a pending request
-  if (user.facultyRequest && user.facultyRequest.status === 'pending') {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'You already have a pending faculty request'
-    });
-  }
-
-  // Create faculty request
-  user.facultyRequest = {
-    status: 'pending',
-    requestedAt: new Date(),
-    reason,
-    qualifications,
-    document: uploadedPdf
-      ? {
-          originalName: uploadedPdf.originalname,
-          fileName: uploadedPdf.filename,
-          mimeType: uploadedPdf.mimetype,
-          size: uploadedPdf.size,
-          path: `/uploads/faculty-requests/${uploadedPdf.filename}`,
-          uploadedAt: new Date()
-        }
-      : undefined
-  };
-
-  await user.save();
-
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Faculty role request submitted successfully',
-    data: user.facultyRequest
-  });
 });
 
 // Get All Faculty Requests (Admin only)
-export const getFacultyRequests = asyncHandler(async (req, res) => {
-  const { status } = req.query;
-  const query = { 'facultyRequest.status': status || 'pending' };
+export const getFacultyRequests = asyncHandler(async(req, res) => {
+    const { status } = req.query;
+    const query = { 'facultyRequest.status': status || 'pending' };
 
-  const users = await User.find(query)
-    .select('firstName lastName email role facultyRequest createdAt')
-    .populate('institution', 'name code')
-    .sort({ 'facultyRequest.requestedAt': -1 });
+    const users = await User.find(query)
+        .select('firstName lastName email role facultyRequest createdAt')
+        .populate('institution', 'name code')
+        .sort({ 'facultyRequest.requestedAt': -1 });
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    data: users,
-    count: users.length
-  });
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        data: users,
+        count: users.length
+    });
 });
 
 // Approve or Reject Faculty Request (Admin only)
-export const reviewFacultyRequest = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
-  const { action, rejectionReason } = req.body; // action: 'approve' or 'reject'
+export const reviewFacultyRequest = asyncHandler(async(req, res) => {
+    const { userId } = req.params;
+    const { action, rejectionReason } = req.body; // action: 'approve' or 'reject'
 
-  if (!['approve', 'reject'].includes(action)) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Invalid action. Must be "approve" or "reject"'
+    if (!['approve', 'reject'].includes(action)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Invalid action. Must be "approve" or "reject"'
+        });
+    }
+
+    if (action === 'reject' && !rejectionReason) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Rejection reason is required'
+        });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+            success: false,
+            message: 'User not found'
+        });
+    }
+
+    if (!user.facultyRequest || user.facultyRequest.status !== 'pending') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'No pending faculty request found for this user'
+        });
+    }
+
+    if (action === 'approve') {
+        user.role = USER_ROLES.FACULTY;
+        user.facultyRequest.status = 'approved';
+        user.facultyRequest.reviewedAt = new Date();
+        user.facultyRequest.reviewedBy = req.userId;
+    } else {
+        user.facultyRequest.status = 'rejected';
+        user.facultyRequest.reviewedAt = new Date();
+        user.facultyRequest.reviewedBy = req.userId;
+        user.facultyRequest.rejectionReason = rejectionReason;
+    }
+
+    await user.save();
+
+    // Emit real-time update to admins
+    const io = getIOInstance();
+    if (io) {
+        try {
+            const stats = await computeDashboardStats(user.institution);
+            io.to('admins').emit('dashboard-stats', { stats });
+            io.to('admins').emit('dashboard-activity', {
+                type: 'FACULTY_REQUEST_REVIEW',
+                user: { firstName: user.firstName, lastName: user.lastName, email: user.email },
+                action,
+                timestamp: new Date().toISOString()
+            });
+        } catch (err) {
+            console.error('Failed to emit dashboard update:', err);
+        }
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: `Faculty request ${action}d successfully`,
+        data: user
     });
-  }
-
-  if (action === 'reject' && !rejectionReason) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Rejection reason is required'
-    });
-  }
-
-  const user = await User.findById(userId);
-  
-  if (!user) {
-    return res.status(HTTP_STATUS.NOT_FOUND).json({
-      success: false,
-      message: 'User not found'
-    });
-  }
-
-  if (!user.facultyRequest || user.facultyRequest.status !== 'pending') {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'No pending faculty request found for this user'
-    });
-  }
-
-  if (action === 'approve') {
-    user.role = USER_ROLES.FACULTY;
-    user.facultyRequest.status = 'approved';
-    user.facultyRequest.reviewedAt = new Date();
-    user.facultyRequest.reviewedBy = req.userId;
-  } else {
-    user.facultyRequest.status = 'rejected';
-    user.facultyRequest.reviewedAt = new Date();
-    user.facultyRequest.reviewedBy = req.userId;
-    user.facultyRequest.rejectionReason = rejectionReason;
-  }
-
-  await user.save();
-
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: `Faculty request ${action}d successfully`,
-    data: user
-  });
 });
 
 // Forgot Password - Send Reset Email
-export const forgotPassword = asyncHandler(async (req, res) => {
-  const { email } = req.body;
+export const forgotPassword = asyncHandler(async(req, res) => {
+    const { email } = req.body;
 
-  // Validate email
-  if (!email) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Email is required'
-    });
-  }
+    // Validate email
+    if (!email) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Email is required'
+        });
+    }
 
-  // Find user by email
-  const user = await User.findOne({ email: email.toLowerCase() });
-  
-  if (!user) {
-    // For security, don't reveal if email exists
-    return res.status(HTTP_STATUS.OK).json({
-      success: true,
-      message: 'If an account exists with this email, a password reset link will be sent'
-    });
-  }
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
 
-  // Generate reset token
-  const resetToken = crypto.randomBytes(32).toString('hex');
-  
-  // Hash and store the token in database
-  user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-  user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
-  
-  await user.save();
+    if (!user) {
+        // For security, don't reveal if email exists
+        return res.status(HTTP_STATUS.OK).json({
+            success: true,
+            message: 'If an account exists with this email, a password reset link will be sent'
+        });
+    }
 
-  // Send email with reset link
-  const emailResult = await sendPasswordResetEmail(
-    user.email,
-    resetToken,
-    user.firstName
-  );
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
 
-  if (!emailResult.success) {
-    // Clear the reset token if email fails
-    user.passwordResetToken = undefined;
-    user.passwordResetExpires = undefined;
+    // Hash and store the token in database
+    user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.passwordResetExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiry
+
     await user.save();
 
-    console.error('Password reset email failed:', emailResult.error);
-    return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
-      success: false,
-      message: 'Failed to send password reset email. Please try again later or contact support.'
-    });
-  }
+    // Send email with reset link
+    const emailResult = await sendPasswordResetEmail(
+        user.email,
+        resetToken,
+        user.firstName
+    );
 
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Password reset link sent to your email. Link expires in 5 minutes.'
-  });
+    if (!emailResult.success) {
+        // Clear the reset token if email fails
+        user.passwordResetToken = undefined;
+        user.passwordResetExpires = undefined;
+        await user.save();
+
+        console.error('Password reset email failed:', emailResult.error);
+        return res.status(HTTP_STATUS.INTERNAL_ERROR).json({
+            success: false,
+            message: 'Failed to send password reset email. Please try again later or contact support.'
+        });
+    }
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Password reset link sent to your email. Link expires in 5 minutes.'
+    });
 });
 
 // Reset Password - Verify Token and Update Password
-export const resetPassword = asyncHandler(async (req, res) => {
-  const { token, email, newPassword, confirmPassword } = req.body;
+export const resetPassword = asyncHandler(async(req, res) => {
+    const { token, email, newPassword, confirmPassword } = req.body;
 
-  // Validate inputs
-  if (!token || !email || !newPassword || !confirmPassword) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'All fields are required'
+    // Validate inputs
+    if (!token || !email || !newPassword || !confirmPassword) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'All fields are required'
+        });
+    }
+
+    // Check password match
+    if (newPassword !== confirmPassword) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Passwords do not match'
+        });
+    }
+
+    // Check password length
+    if (newPassword.length < 6) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            success: false,
+            message: 'Password must be at least 6 characters'
+        });
+    }
+
+    // Find user and verify reset token
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await User.findOne({
+        email: email.toLowerCase(),
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: new Date() } // Token not expired
     });
-  }
 
-  // Check password match
-  if (newPassword !== confirmPassword) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Passwords do not match'
+    if (!user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+            success: false,
+            message: 'Invalid or expired reset token. Please request a new password reset.'
+        });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+
+    await user.save();
+
+    res.status(HTTP_STATUS.OK).json({
+        success: true,
+        message: 'Password reset successfully. You can now login with your new password.'
     });
-  }
-
-  // Check password length
-  if (newPassword.length < 6) {
-    return res.status(HTTP_STATUS.BAD_REQUEST).json({
-      success: false,
-      message: 'Password must be at least 6 characters'
-    });
-  }
-
-  // Find user and verify reset token
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
-  
-  const user = await User.findOne({
-    email: email.toLowerCase(),
-    passwordResetToken: hashedToken,
-    passwordResetExpires: { $gt: new Date() } // Token not expired
-  });
-
-  if (!user) {
-    return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-      success: false,
-      message: 'Invalid or expired reset token. Please request a new password reset.'
-    });
-  }
-
-  // Update password
-  user.password = newPassword;
-  user.passwordResetToken = undefined;
-  user.passwordResetExpires = undefined;
-  
-  await user.save();
-
-  res.status(HTTP_STATUS.OK).json({
-    success: true,
-    message: 'Password reset successfully. You can now login with your new password.'
-  });
 });
-

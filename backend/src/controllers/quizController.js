@@ -8,6 +8,7 @@ import mongoose from 'mongoose';
 import { HTTP_STATUS, QUIZ_STATUS, SUBMISSION_STATUS } from '../config/constants.js';
 import { asyncHandler } from '../utils/errorHandler.js';
 import { notifyNewQuiz } from '../services/emailNotificationService.js';
+import { sendFacultyNotification } from '../utils/facultyEmailAutomation.js';
 
 // Add Questions to a Quiz
 export const addQuestionsToQuiz = asyncHandler(async (req, res) => {
@@ -118,6 +119,21 @@ export const createQuiz = asyncHandler(async (req, res) => {
     },
     accessWindow: accessWindow || {}
   });
+
+  // Send email notification to faculty subscribers
+  try {
+    await sendFacultyNotification('quiz-update', {
+      quizTitle: quiz.title,
+      status: quiz.status,
+      duration: quiz.duration,
+      totalQuestions: 0,
+      description: quiz.description,
+      facultyName: req.userDetails?.firstName || 'Faculty'
+    });
+  } catch (error) {
+    console.warn('Failed to send faculty notification:', error);
+    // Don't fail the quiz creation if email notification fails
+  }
 
   res.status(HTTP_STATUS.CREATED).json({
     success: true,
@@ -816,6 +832,110 @@ export const getQuizSubmissions = asyncHandler(async (req, res) => {
   res.status(HTTP_STATUS.OK).json({
     success: true,
     data: submissions
+  });
+});
+
+// Get detailed submission for faculty review/edit
+export const getSubmissionDetails = asyncHandler(async (req, res) => {
+  const { submissionId } = req.params;
+
+  const submission = await StudentSubmission.findById(submissionId)
+    .populate('student', 'firstName lastName enrollmentNumber email')
+    .populate('quiz', 'title totalMarks passingMarks subject chapter duration');
+
+  if (!submission) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({
+      success: false,
+      message: 'Submission not found'
+    });
+  }
+
+  const questions = await Question.find({ quiz: submission.quiz?._id })
+    .sort({ order: 1 })
+    .lean();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    data: {
+      submission,
+      quiz: submission.quiz,
+      questions
+    }
+  });
+});
+
+// Update reviewed submission with manual edits
+export const updateSubmissionGrade = asyncHandler(async (req, res) => {
+  const { submissionId } = req.params;
+  const { answers = [], reviewNotes = '' } = req.body;
+
+  const submission = await StudentSubmission.findById(submissionId).populate('quiz');
+
+  if (!submission) {
+    return res.status(HTTP_STATUS.NOT_FOUND).json({
+      success: false,
+      message: 'Submission not found'
+    });
+  }
+
+  const incomingAnswers = Array.isArray(answers) ? answers : [];
+  const normalizedAnswers = incomingAnswers.map((answer) => ({
+    questionId: answer.questionId,
+    answer: answer.answer,
+    selectedOptions: answer.selectedOptions || [],
+    attemptTime: answer.attemptTime || new Date(),
+    timeSpent: Number(answer.timeSpent) || 0,
+    isCorrect: Boolean(answer.isCorrect),
+    marksObtained: Number(answer.marksObtained) || 0,
+    marksAllotted: Number(answer.marksAllotted) || 0
+  }));
+
+  const totalMarks = normalizedAnswers.reduce(
+    (sum, answer) => sum + (Number(answer.marksAllotted) || 0),
+    0
+  );
+  const obtainedMarks = normalizedAnswers.reduce(
+    (sum, answer) => sum + (Number(answer.marksObtained) || 0),
+    0
+  );
+
+  const safeTotalMarks = totalMarks || Number(submission.totalMarks) || 0;
+  const percentage = safeTotalMarks > 0 ? (obtainedMarks / safeTotalMarks) * 100 : 0;
+  const passingMarks = Number(submission.quiz?.passingMarks || 0);
+  const isPassed = obtainedMarks >= passingMarks;
+
+  submission.answers = normalizedAnswers;
+  submission.totalMarks = safeTotalMarks;
+  submission.score = obtainedMarks;
+  submission.totalMarksObtained = obtainedMarks;
+  submission.percentage = percentage;
+  submission.isPassed = isPassed;
+  submission.grade = percentage >= 90 ? 'A+'
+    : percentage >= 80 ? 'A'
+      : percentage >= 70 ? 'B'
+        : percentage >= 60 ? 'C'
+          : percentage >= 50 ? 'D'
+            : 'F';
+  submission.status = SUBMISSION_STATUS.GRADED;
+  submission.reviewedBy = req.userId;
+  submission.reviewedAt = new Date();
+  submission.reviewNotes = reviewNotes;
+
+  await submission.save();
+
+  res.status(HTTP_STATUS.OK).json({
+    success: true,
+    message: 'Submission updated successfully',
+    data: {
+      submission,
+      summary: {
+        totalMarks: safeTotalMarks,
+        obtainedMarks,
+        percentage,
+        isPassed,
+        grade: submission.grade
+      }
+    }
   });
 });
 

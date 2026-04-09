@@ -1,6 +1,7 @@
 import Subscriber from '../models/Subscriber.js';
 import User from '../models/User.js';
 import { sendSubscriptionConfirmationEmail, sendUnsubscribeConfirmationEmail, sendNewsletterEmail } from '../utils/emailService.js';
+import { sendFacultyNotification, sendWeeklyNewsletter } from '../utils/facultyEmailAutomation.js';
 
 // Subscribe to mailing list
 export const subscribeToNewsletter = async (req, res) => {
@@ -404,6 +405,67 @@ export const checkSubscriptionStatus = async (req, res) => {
   }
 };
 
+// Send faculty notification email (Admin only)
+export const sendFacultyNotificationEmail = async (req, res) => {
+  try {
+    const { eventType, data } = req.body;
+
+    if (!eventType || !data) {
+      return res.status(400).json({
+        success: false,
+        message: 'Event type and data are required'
+      });
+    }
+
+    const result = await sendFacultyNotification(eventType, data);
+
+    return res.status(result.success ? 200 : 400).json({
+      success: result.success,
+      message: result.message,
+      sent: result.sent,
+      failed: result.failed,
+      eventType
+    });
+
+  } catch (error) {
+    console.error('Send faculty notification error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send faculty notification',
+      error: error.message
+    });
+  }
+};
+
+// Send weekly newsletter to faculty (Admin only)
+export const triggerWeeklyNewsletter = async (req, res) => {
+  try {
+    const result = await sendWeeklyNewsletter();
+
+    if (result.success) {
+      return res.status(200).json({
+        success: true,
+        message: 'Weekly newsletter sent successfully',
+        sent: result.sent,
+        failed: result.failed
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: result.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Weekly newsletter error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to send weekly newsletter',
+      error: error.message
+    });
+  }
+};
+
 export default {
   subscribeToNewsletter,
   unsubscribeFromNewsletter,
@@ -411,5 +473,7 @@ export default {
   getAllSubscribers,
   getSubscriberStats,
   sendNewsletterToSubscribers,
-  checkSubscriptionStatus
+  checkSubscriptionStatus,
+  sendFacultyNotificationEmail,
+  triggerWeeklyNewsletter
 };

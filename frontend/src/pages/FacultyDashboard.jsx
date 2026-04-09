@@ -7,6 +7,7 @@ import { MainLayout } from '../components';
 import CountUp from '../components/CountUp';
 import socket from '../socket';
 import { ResponsivePageLayout } from '../components/Layout/ResponsivePageLayout';
+import FacultyFooter from '../components/Layout/FacultyFooter';
 import { useAuthStore } from '../context/store';
 import '../styles/dashboards.css';
 import '../styles/dark-mode.css';
@@ -537,6 +538,7 @@ const FacultyDashboard = () => {
           </motion.div>
         </motion.div>
       </ResponsivePageLayout>
+      <FacultyFooter />
     </MainLayout>
   );
 };

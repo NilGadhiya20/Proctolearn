@@ -139,6 +139,28 @@ export const getQuizSubmissions = async (quizId) => {
   }
 };
 
+// Get detailed submission for faculty review/edit
+export const getSubmissionDetails = async (submissionId) => {
+  try {
+    const response = await apiClient.get(`/quizzes/submission/${submissionId}/details`);
+    return response.data;
+  } catch (error) {
+    console.error('Get submission details error:', error);
+    throw error;
+  }
+};
+
+// Update a reviewed submission with edited answers/marks
+export const updateSubmissionGrade = async (submissionId, payload) => {
+  try {
+    const response = await apiClient.patch(`/quizzes/submission/${submissionId}/grade`, payload);
+    return response.data;
+  } catch (error) {
+    console.error('Update submission grade error:', error);
+    throw error;
+  }
+};
+
 // Get activity logs for one submission (Faculty/Admin)
 export const getSubmissionActivityLogs = async (submissionId) => {
   try {

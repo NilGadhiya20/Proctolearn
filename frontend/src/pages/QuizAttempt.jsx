@@ -225,9 +225,11 @@ export default function QuizAttempt() {
         if (data.submission.answers && data.submission.answers.length > 0) {
           const answerMap = {};
           data.submission.answers.forEach(ans => {
-            answerMap[ans.question] = ans.answer;
+            const questionKey = ans.questionId || ans.question;
+            if (!questionKey) return;
+            answerMap[questionKey] = ans.answer ?? ans.selectedOption ?? ans.selectedOptions ?? '';
             if (ans.flagged) {
-              setFlagged(prev => new Set([...prev, ans.question]));
+              setFlagged(prev => new Set([...prev, questionKey]));
             }
           });
           setAnswers(answerMap);
@@ -503,8 +505,17 @@ export default function QuizAttempt() {
 
     setSubmitting(true);
     try {
-      await submitQuiz(quizId);
-      toast.success('Quiz auto-submitted');
+      const answersPayload = questions
+        .map((question) => ({
+          questionId: question._id,
+          answer: answers[question._id]
+        }))
+        .filter((entry) => entry.answer !== undefined && entry.answer !== null && entry.answer !== '');
+
+      const result = await submitQuiz(quizId, answersPayload);
+      const score = result?.submission?.score ?? result?.submission?.totalMarksObtained ?? result?.grading?.obtainedMarks;
+      const total = result?.submission?.totalMarks ?? result?.grading?.totalMarks;
+      toast.success(score != null && total ? `Quiz auto-submitted: ${score}/${total}` : 'Quiz auto-submitted');
       navigate('/student/dashboard');
     } catch (e) {
       toast.error('Auto-submit failed');
@@ -515,10 +526,21 @@ export default function QuizAttempt() {
 
   // Manual submit
   const handleSubmit = async () => {
+    if (submitting) return;
+
     setSubmitting(true);
     try {
-      await submitQuiz(quizId);
-      toast.success('Quiz submitted successfully');
+      const answersPayload = questions
+        .map((question) => ({
+          questionId: question._id,
+          answer: answers[question._id]
+        }))
+        .filter((entry) => entry.answer !== undefined && entry.answer !== null && entry.answer !== '');
+
+      const result = await submitQuiz(quizId, answersPayload);
+      const score = result?.submission?.score ?? result?.submission?.totalMarksObtained ?? result?.grading?.obtainedMarks;
+      const total = result?.submission?.totalMarks ?? result?.grading?.totalMarks;
+      toast.success(score != null && total ? `Quiz submitted successfully: ${score}/${total}` : 'Quiz submitted successfully');
       navigate('/student/dashboard');
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Submit failed');

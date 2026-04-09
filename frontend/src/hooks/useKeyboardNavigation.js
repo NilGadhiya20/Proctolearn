@@ -120,24 +120,24 @@ export const useTabNavigation = (tabCount, currentTab, onTabChange) => {
     let newTab = currentTab;
 
     switch (e.key) {
-      case KEYS.ARROW_LEFT:
-        e.preventDefault();
-        newTab = currentTab > 0 ? currentTab - 1 : tabCount - 1;
-        break;
-      case KEYS.ARROW_RIGHT:
-        e.preventDefault();
-        newTab = currentTab < tabCount - 1 ? currentTab + 1 : 0;
-        break;
-      case KEYS.HOME:
-        e.preventDefault();
-        newTab = 0;
-        break;
-      case KEYS.END:
-        e.preventDefault();
-        newTab = tabCount - 1;
-        break;
-      default:
-        return;
+    case KEYS.ARROW_LEFT:
+      e.preventDefault();
+      newTab = currentTab > 0 ? currentTab - 1 : tabCount - 1;
+      break;
+    case KEYS.ARROW_RIGHT:
+      e.preventDefault();
+      newTab = currentTab < tabCount - 1 ? currentTab + 1 : 0;
+      break;
+    case KEYS.HOME:
+      e.preventDefault();
+      newTab = 0;
+      break;
+    case KEYS.END:
+      e.preventDefault();
+      newTab = tabCount - 1;
+      break;
+    default:
+      return;
     }
 
     if (newTab !== currentTab) {
@@ -162,34 +162,34 @@ export const useDropdownNavigation = (isOpen, onClose, itemCount, onSelect) => {
 
     const handleKeyDown = (e) => {
       switch (e.key) {
-        case KEYS.ESCAPE:
-          e.preventDefault();
-          onClose();
-          break;
-        case KEYS.ARROW_DOWN:
-          e.preventDefault();
-          selectedIndexRef.current = Math.min(selectedIndexRef.current + 1, itemCount - 1);
-          break;
-        case KEYS.ARROW_UP:
-          e.preventDefault();
-          selectedIndexRef.current = Math.max(selectedIndexRef.current - 1, 0);
-          break;
-        case KEYS.HOME:
-          e.preventDefault();
-          selectedIndexRef.current = 0;
-          break;
-        case KEYS.END:
-          e.preventDefault();
-          selectedIndexRef.current = itemCount - 1;
-          break;
-        case KEYS.ENTER:
-        case KEYS.SPACE:
-          e.preventDefault();
-          onSelect(selectedIndexRef.current);
-          onClose();
-          break;
-        default:
-          return;
+      case KEYS.ESCAPE:
+        e.preventDefault();
+        onClose();
+        break;
+      case KEYS.ARROW_DOWN:
+        e.preventDefault();
+        selectedIndexRef.current = Math.min(selectedIndexRef.current + 1, itemCount - 1);
+        break;
+      case KEYS.ARROW_UP:
+        e.preventDefault();
+        selectedIndexRef.current = Math.max(selectedIndexRef.current - 1, 0);
+        break;
+      case KEYS.HOME:
+        e.preventDefault();
+        selectedIndexRef.current = 0;
+        break;
+      case KEYS.END:
+        e.preventDefault();
+        selectedIndexRef.current = itemCount - 1;
+        break;
+      case KEYS.ENTER:
+      case KEYS.SPACE:
+        e.preventDefault();
+        onSelect(selectedIndexRef.current);
+        onClose();
+        break;
+      default:
+        return;
       }
     };
 
